@@ -2,84 +2,87 @@
 Triton DSL Lexer
 Tokenizes Triton source code for parsing.
 """
+
 import ply.lex as lex
 
 # Reserved keywords
 reserved = {
-    'layer': 'LAYER',
-    'let': 'LET',
-    'fn': 'FN',
-    'return': 'RETURN',
-    'TernaryTensor': 'TERNARYTENSOR',
-    'trit': 'TRIT',
-    'int8': 'INT8',
-    'float16': 'FLOAT16',
-    'float32': 'FLOAT32',
+    "layer": "LAYER",
+    "let": "LET",
+    "fn": "FN",
+    "return": "RETURN",
+    "TernaryTensor": "TERNARYTENSOR",
+    "trit": "TRIT",
+    "int8": "INT8",
+    "float16": "FLOAT16",
+    "float32": "FLOAT32",
 }
 
 # Token list
 tokens = [
-    'IDENTIFIER',
-    'INTEGER',
-    'FLOAT',
-    'PLUS',
-    'MINUS',
-    'TIMES',
-    'MATMUL',
-    'ARROW',
-    'ASSIGN',
-    'LPAREN',
-    'RPAREN',
-    'LBRACE',
-    'RBRACE',
-    'LBRACKET',
-    'RBRACKET',
-    'COMMA',
-    'COLON',
-    'SEMICOLON',
+    "IDENTIFIER",
+    "INTEGER",
+    "FLOAT",
+    "PLUS",
+    "MINUS",
+    "TIMES",
+    "MATMUL",
+    "ARROW",
+    "ASSIGN",
+    "LPAREN",
+    "RPAREN",
+    "LBRACE",
+    "RBRACE",
+    "LBRACKET",
+    "RBRACKET",
+    "COMMA",
+    "COLON",
+    "SEMICOLON",
 ] + list(reserved.values())
 
 # Token rules
-t_PLUS = r'\+'
-t_MINUS = r'-'
-t_TIMES = r'\*'
-t_MATMUL = r'@'
-t_ARROW = r'->'
-t_ASSIGN = r'='
-t_LPAREN = r'\('
-t_RPAREN = r'\)'
-t_LBRACE = r'\{'
-t_RBRACE = r'\}'
-t_LBRACKET = r'\['
-t_RBRACKET = r'\]'
-t_COMMA = r','
-t_COLON = r':'
-t_SEMICOLON = r';'
+# ruff: noqa: N816 - PLY requires t_TOKEN naming convention
+t_PLUS = r"\+"
+t_MINUS = r"-"
+t_TIMES = r"\*"
+t_MATMUL = r"@"
+t_ARROW = r"->"
+t_ASSIGN = r"="
+t_LPAREN = r"\("
+t_RPAREN = r"\)"
+t_LBRACE = r"\{"
+t_RBRACE = r"\}"
+t_LBRACKET = r"\["
+t_RBRACKET = r"\]"
+t_COMMA = r","
+t_COLON = r":"
+t_SEMICOLON = r";"
 
 # Ignored characters (spaces and tabs)
-t_ignore = ' \t'
+t_ignore = " \t"
 
 
+# ruff: noqa: N802 - PLY requires t_TOKEN naming convention for functions
 def t_FLOAT(t):
-    r'\d+\.\d+'
+    r"\d+\.\d+"
     t.value = float(t.value)
     return t
 
 
 def t_INTEGER(t):
-    r'\d+'
+    r"\d+"
     t.value = int(t.value)
     return t
 
 
 def t_IDENTIFIER(t):
-    r'[a-zA-Z_][a-zA-Z_0-9]*'
-    t.type = reserved.get(t.value, 'IDENTIFIER')
+    r"[a-zA-Z_][a-zA-Z_0-9]*"
+    t.type = reserved.get(t.value, "IDENTIFIER")
     return t
 
 
 def t_newline(t):
-    r'\n+'
+    r"\n+"
     t.lexer.lineno += len(t.value)
 
 
