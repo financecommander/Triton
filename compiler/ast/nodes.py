@@ -17,6 +17,9 @@ class Node(ABC):
         """Accept a visitor for the visitor pattern."""
         pass
     
+    # Location information for error reporting.
+    # Defaults to 0 to allow easier test node creation and avoid None checks.
+    # Parser should always set these to actual values from source.
     lineno: int = 0
     col_offset: int = 0
     

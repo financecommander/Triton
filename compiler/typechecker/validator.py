@@ -70,9 +70,11 @@ class TypeChecker(Visitor):
         """Check if two types are compatible for operations."""
         # Same type is always compatible
         if type(type1) == type(type2):
-            if isinstance(type1, (IntType, FloatType)):
+            if isinstance(type1, IntType) and isinstance(type2, IntType):
                 return type1.bits == type2.bits
-            if isinstance(type1, TensorType):
+            if isinstance(type1, FloatType) and isinstance(type2, FloatType):
+                return type1.bits == type2.bits
+            if isinstance(type1, TensorType) and isinstance(type2, TensorType):
                 return (self.types_compatible(type1.element_type, type2.element_type) and
                         type1.shape == type2.shape)
             return True
@@ -196,8 +198,8 @@ class TypeChecker(Visitor):
                     )
                     return None
                 
-                # Result shape
-                result_shape = left_type.shape[:-1] + right_type.shape[-1:]
+                # Result shape: combine all but last dim of left with all but first dim of right
+                result_shape = left_type.shape[:-1] + [right_type.shape[-1]]
                 return TensorType(element_type=left_type.element_type, shape=result_shape)
             
             return TensorType(element_type=left_type.element_type)
