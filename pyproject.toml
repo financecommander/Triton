@@ -37,6 +37,13 @@ dev = [
     "ruff>=0.1.0",
     "mypy>=1.7.0",
 ]
+benchmark = [
+    "pytest-benchmark>=4.0.0",
+    "matplotlib>=3.7.0",
+    "pandas>=2.0.0",
+    "scipy>=1.11.0",
+    "seaborn>=0.12.0",
+]
 cuda = [
     "cuda-python>=12.0.0",
     "triton>=2.1.0",
