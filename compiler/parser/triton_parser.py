@@ -3,6 +3,8 @@ Triton DSL Parser
 LALR parser using PLY yacc to generate Abstract Syntax Tree.
 """
 
+import sys
+
 import ply.yacc as yacc
 
 from compiler.ast.nodes import (
@@ -126,7 +128,13 @@ def p_expression_binop(p):
 def p_expression_unary(p):
     """expression : MINUS expression %prec UMINUS"""
     # Create a binary operation: 0 - expression
-    p[0] = BinaryOp(IntegerLiteral(0), "-", p[2], lineno=p.lineno(1), col_offset=0)
+    p[0] = BinaryOp(
+        IntegerLiteral(0, lineno=p.lineno(1), col_offset=0),
+        "-",
+        p[2],
+        lineno=p.lineno(1),
+        col_offset=0,
+    )
 
 
 def p_expression_function_call(p):
@@ -198,11 +206,11 @@ def p_empty(p):
 def p_error(p):
     """Error handling with recovery."""
     if p:
-        print(f"Syntax error at token {p.type} ('{p.value}') at line {p.lineno}")
+        sys.stderr.write(f"Syntax error at token {p.type} ('{p.value}') at line {p.lineno}\n")
         # Try to recover by skipping the token
         parser.errok()
     else:
-        print("Syntax error at EOF")
+        sys.stderr.write("Syntax error at EOF\n")
 
 
 # Build the parser

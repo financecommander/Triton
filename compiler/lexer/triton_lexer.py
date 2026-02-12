@@ -3,6 +3,8 @@ Triton DSL Lexer
 Tokenizes Triton source code for parsing.
 """
 
+import sys
+
 import ply.lex as lex
 
 # Reserved keywords
@@ -87,7 +89,7 @@ def t_newline(t):
 
 
 def t_error(t):
-    print(f"Illegal character '{t.value[0]}' at line {t.lineno}")
+    sys.stderr.write(f"Illegal character '{t.value[0]}' at line {t.lineno}\n")
     t.lexer.skip(1)
 
 
