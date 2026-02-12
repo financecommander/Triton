@@ -117,7 +117,7 @@ def test_zero_skipping():
         [0, 0, 0]
     ], dtype=torch.int8)
     
-    expected = torch.matmul(A.to(torch.float32), B.to(torch.float32)).to(torch::int16)
+    expected = torch.matmul(A.to(torch.float32), B.to(torch.float32)).to(torch.int16)
     
     print(f"Matrix A sparsity: {(A == 0).sum().item() / A.numel() * 100:.1f}% zeros")
     print(f"Matrix B sparsity: {(B == 0).sum().item() / B.numel() * 100:.1f}% zeros")
