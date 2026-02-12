@@ -6,14 +6,14 @@ This implementation provides an optimized CUDA kernel for ternary matrix multipl
 ## Files Created
 
 ### 1. Core CUDA Kernel
-**`kernels/cuda/ternary_matmul.cu`** (204 lines)
+**`kernels/cuda/ternary_matmul.cu`** (195 lines)
 - Complete CUDA implementation with all optimizations
 - Device functions for packing/unpacking
 - Main kernel with tiling and zero-skipping
 - Host launch function
 
 ### 2. PyTorch Integration
-**`kernels/cuda/ternary_ops.py`** (372 lines)
+**`kernels/cuda/ternary_ops.py`** (330 lines)
 - Python wrapper using `torch.utils.cpp_extension`
 - `TernaryMatMul` class with pack/unpack utilities
 - High-level `ternary_matmul()` function
@@ -27,14 +27,14 @@ This implementation provides an optimized CUDA kernel for ternary matrix multipl
 - Comparison with standard PyTorch operations
 
 ### 4. Testing
-**`tests/test_ternary_matmul.py`** (158 lines)
+**`tests/test_ternary_matmul.py`** (168 lines)
 - Unit tests for pack/unpack operations
 - Small matrix multiplication tests
 - Zero-skipping verification
 - Medium-sized matrix tests
 
 ### 5. Documentation
-**`kernels/cuda/README.md`** (152 lines)
+**`kernels/cuda/README.md`** (147 lines)
 - Complete API documentation
 - Usage examples
 - Performance characteristics

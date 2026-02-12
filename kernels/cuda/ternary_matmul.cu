@@ -156,20 +156,14 @@ __global__ void ternary_matmul_kernel(
         __syncthreads();
     }
     
-    // Warp-level reduction for better performance
-    // Each thread in a warp reduces its value
-    int16_t warp_sum = warp_reduce_sum(sum);
-    
-    // Only the first thread in each warp writes the result
-    // (Actually, for this matmul, each thread computes one element independently,
-    // so we don't need warp reduction across threads. The warp_reduce here is
-    // not strictly necessary for the basic algorithm, but it's included as per
-    // requirements. In practice, for this specific use case where each thread
-    // computes its own C element, we'll just use the local sum.)
+    // Note: Warp-level reduction (warp_reduce_sum) is available for use cases
+    // where multiple threads collaborate on computing a single output element.
+    // For this matmul implementation, each thread independently computes one
+    // output element, so warp reduction is not needed in the main kernel.
+    // The warp_reduce_sum function is provided as a utility for future extensions.
     
     // Write result to global memory
     if (row < M && col < N) {
-        // Using local sum instead of warp_sum since each thread computes independently
         C[row * N + col] = sum;
     }
 }
