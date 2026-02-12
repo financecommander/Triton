@@ -9,6 +9,46 @@ from backend.pytorch.ops.activations import ternary_activation
 from backend.pytorch.ops.quantize import quantize
 
 
+# Helper function for testing gradient flow without int8 conversion
+def _create_quantize_function_deterministic():
+    """Create a quantize autograd function for deterministic mode (testing only)."""
+    class QuantizeFunction(torch.autograd.Function):
+        @staticmethod
+        def forward(ctx, inp, thresh):
+            output = torch.zeros_like(inp)
+            output[inp > thresh] = 1
+            output[inp < -thresh] = -1
+            return output
+        
+        @staticmethod
+        def backward(ctx, grad_output):
+            return grad_output, None
+    
+    return QuantizeFunction
+
+
+def _create_quantize_function_stochastic():
+    """Create a quantize autograd function for stochastic mode (testing only)."""
+    class QuantizeFunction(torch.autograd.Function):
+        @staticmethod
+        def forward(ctx, input_tensor, thresh):
+            probs = torch.sigmoid(input_tensor / thresh)
+            random_vals = torch.rand_like(input_tensor)
+            output = torch.zeros_like(input_tensor)
+            output[random_vals < probs] = 1
+            output[random_vals >= probs] = -1
+            abs_input = torch.abs(input_tensor)
+            zero_mask = abs_input < (thresh / 2)
+            output[zero_mask] = 0
+            return output
+        
+        @staticmethod
+        def backward(ctx, grad_output):
+            return grad_output, None
+    
+    return QuantizeFunction
+
+
 class TestQuantize:
     """Test suite for quantize function."""
 
@@ -88,28 +128,10 @@ class TestQuantize:
         x = torch.randn(10, requires_grad=True)
         # Note: The quantize function returns int8, which doesn't support gradients
         # In practice, you would keep the result as float during training
-        # For testing gradient flow, we test the autograd function directly
-        from backend.pytorch.ops.quantize import quantize
+        # For testing gradient flow, we use the helper function
         
-        # To test gradient flow, we need to work with the float output before int8 conversion
-        # We'll create a wrapper that doesn't convert to int8
-        def quantize_float(x_in):
-            # Manually call the autograd function without int8 conversion
-            class QuantizeFunction(torch.autograd.Function):
-                @staticmethod
-                def forward(ctx, input_tensor, thresh):
-                    output = torch.zeros_like(input_tensor)
-                    output[input_tensor > thresh] = 1
-                    output[input_tensor < -thresh] = -1
-                    return output
-                
-                @staticmethod
-                def backward(ctx, grad_output):
-                    return grad_output, None
-            
-            return QuantizeFunction.apply(x_in, 0.33)
-        
-        y = quantize_float(x)
+        QuantizeFunction = _create_quantize_function_deterministic()
+        y = QuantizeFunction.apply(x, 0.33)
         loss = y.sum()
         loss.backward()
 
@@ -127,19 +149,7 @@ class TestQuantize:
         # We test that gradients flow through correctly instead.
         
         x = torch.randn(5, dtype=torch.double, requires_grad=True)
-
-        # Test with float-only version
-        class QuantizeFunction(torch.autograd.Function):
-            @staticmethod
-            def forward(ctx, inp, thresh):
-                output = torch.zeros_like(inp)
-                output[inp > thresh] = 1
-                output[inp < -thresh] = -1
-                return output
-            
-            @staticmethod
-            def backward(ctx, grad_output):
-                return grad_output, None
+        QuantizeFunction = _create_quantize_function_deterministic()
         
         y = QuantizeFunction.apply(x, 0.33)
         y.sum().backward()
@@ -154,24 +164,7 @@ class TestQuantize:
         x = torch.randn(5, dtype=torch.double, requires_grad=True)
 
         # Test that gradients exist and flow through for stochastic mode
-        # We use a simpler test since stochastic quantization doesn't pass gradcheck
-        # due to randomness in the forward pass
-        class QuantizeFunction(torch.autograd.Function):
-            @staticmethod
-            def forward(ctx, input_tensor, thresh):
-                probs = torch.sigmoid(input_tensor / thresh)
-                random_vals = torch.rand_like(input_tensor)
-                output = torch.zeros_like(input_tensor)
-                output[random_vals < probs] = 1
-                output[random_vals >= probs] = -1
-                abs_input = torch.abs(input_tensor)
-                zero_mask = abs_input < (thresh / 2)
-                output[zero_mask] = 0
-                return output
-            
-            @staticmethod
-            def backward(ctx, grad_output):
-                return grad_output, None
+        QuantizeFunction = _create_quantize_function_stochastic()
         
         y = QuantizeFunction.apply(x, 0.33)
         y.sum().backward()

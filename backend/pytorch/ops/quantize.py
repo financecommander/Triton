@@ -114,6 +114,7 @@ def quantize(
 
     # Apply the quantization function and convert to int8
     result = QuantizeFunction.apply(x, method, threshold)
-    # Convert to int8 for storage efficiency (this breaks gradient flow, so should
-    # be done after training or in eval mode)
+    # Convert to int8 for storage efficiency and memory optimization.
+    # Note: This conversion detaches the result from the gradient graph.
+    # For training, consider keeping the result as float until after the backward pass.
     return result.to(torch.int8)
