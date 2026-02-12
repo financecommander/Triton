@@ -52,6 +52,7 @@ Usage:
 
 import argparse
 import time
+import tempfile
 from pathlib import Path
 from typing import Tuple, Dict, Any, Optional, Literal
 
@@ -642,8 +643,10 @@ def plot_training_curves(
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
         print(f"Training curves saved to {save_path}")
     else:
-        plt.savefig('/tmp/training_curves.png', dpi=300, bbox_inches='tight')
-        print("Training curves saved to /tmp/training_curves.png")
+        # Use cross-platform temporary directory
+        default_path = Path(tempfile.gettempdir()) / 'training_curves.png'
+        plt.savefig(default_path, dpi=300, bbox_inches='tight')
+        print(f"Training curves saved to {default_path}")
     
     plt.close()
 
@@ -691,8 +694,10 @@ def plot_weight_distribution(model: TernaryNet, save_path: Optional[Path] = None
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
         print(f"Weight distribution saved to {save_path}")
     else:
-        plt.savefig('/tmp/weight_distribution.png', dpi=300, bbox_inches='tight')
-        print("Weight distribution saved to /tmp/weight_distribution.png")
+        # Use cross-platform temporary directory
+        default_path = Path(tempfile.gettempdir()) / 'weight_distribution.png'
+        plt.savefig(default_path, dpi=300, bbox_inches='tight')
+        print(f"Weight distribution saved to {default_path}")
     
     plt.close()
 
@@ -724,8 +729,10 @@ def plot_confusion_matrix(
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
         print(f"Confusion matrix saved to {save_path}")
     else:
-        plt.savefig('/tmp/confusion_matrix.png', dpi=300, bbox_inches='tight')
-        print("Confusion matrix saved to /tmp/confusion_matrix.png")
+        # Use cross-platform temporary directory
+        default_path = Path(tempfile.gettempdir()) / 'confusion_matrix.png'
+        plt.savefig(default_path, dpi=300, bbox_inches='tight')
+        print(f"Confusion matrix saved to {default_path}")
     
     plt.close()
 

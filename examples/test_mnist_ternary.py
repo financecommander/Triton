@@ -7,6 +7,7 @@ without requiring actual MNIST data download.
 """
 
 import sys
+import tempfile
 import torch
 import torch.nn as nn
 import numpy as np
@@ -148,28 +149,25 @@ def test_save_load():
     
     # Create and save model
     model1 = TernaryNet(quantize_method='deterministic')
-    save_path = Path('/tmp/test_model.pth')
     
-    save_ternary_model(model1, save_path)
-    assert save_path.exists(), "Model file not created"
-    print("  ✓ Model saved successfully")
-    
-    # Load model
-    model2 = load_ternary_model(save_path, torch.device('cpu'))
-    
-    # Verify loaded model works
-    x = torch.randn(8, 1, 28, 28)
-    y1 = model1(x)
-    y2 = model2(x)
-    
-    assert torch.allclose(y1, y2, atol=1e-5), "Loaded model produces different output"
-    print("  ✓ Model loaded and produces same output")
-    
-    # Cleanup
-    save_path.unlink()
-    packed_path = Path('/tmp/test_model_packed.pth')
-    if packed_path.exists():
-        packed_path.unlink()
+    # Use temporary directory for cross-platform compatibility
+    with tempfile.TemporaryDirectory() as tmpdir:
+        save_path = Path(tmpdir) / 'test_model.pth'
+        
+        save_ternary_model(model1, save_path)
+        assert save_path.exists(), "Model file not created"
+        print("  ✓ Model saved successfully")
+        
+        # Load model
+        model2 = load_ternary_model(save_path, torch.device('cpu'))
+        
+        # Verify loaded model works
+        x = torch.randn(8, 1, 28, 28)
+        y1 = model1(x)
+        y2 = model2(x)
+        
+        assert torch.allclose(y1, y2, atol=1e-5), "Loaded model produces different output"
+        print("  ✓ Model loaded and produces same output")
     
     print("  ✓ All save/load tests passed!\n")
 
