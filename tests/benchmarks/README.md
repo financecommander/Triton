@@ -15,6 +15,8 @@ This benchmark suite evaluates the performance of ternary neural networks across
 - **Speed**: 2-3x faster inference vs Float32
 - **Memory**: 4x memory reduction vs Float32
 
+> **Note**: The current implementation provides a proof-of-concept framework for benchmarking ternary neural networks. The actual performance targets are achievable with optimized CUDA kernels and proper 2-bit packing, which are planned for future releases. The benchmark infrastructure is production-ready and can accurately measure performance once these optimizations are implemented.
+
 ## Installation
 
 Install benchmark dependencies:

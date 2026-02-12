@@ -27,6 +27,10 @@ MANIFEST
 htmlcov/
 .tox/
 
+# Benchmark results
+tests/benchmarks/results/
+.benchmarks/
+
 # IDEs
 .vscode/
 .idea/

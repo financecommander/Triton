@@ -25,6 +25,7 @@ classifiers = [
 
 dependencies = [
     "torch>=2.1.0",
+    "torchvision>=0.16.0",
     "numpy>=1.24.0",
     "ply>=3.11",
 ]
@@ -61,10 +62,10 @@ include = ["compiler*", "backend*", "kernels*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-python_files = ["test_*.py"]
+python_files = ["test_*.py", "bench_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
-addopts = "-v --cov=compiler --cov=backend --cov=kernels --cov-report=html --cov-report=term"
+addopts = "-v"
 
 [tool.black]
 line-length = 100
