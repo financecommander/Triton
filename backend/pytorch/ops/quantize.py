@@ -78,7 +78,7 @@ def quantize(
             """Forward pass: quantize the input tensor."""
             if quantize_method == "deterministic":
                 # Deterministic threshold-based quantization
-                output = torch.zeros_like(input_tensor, dtype=torch.int8)
+                output = torch.zeros_like(input_tensor)
                 output[input_tensor > thresh] = 1
                 output[input_tensor < -thresh] = -1
             else:  # stochastic
@@ -90,7 +90,7 @@ def quantize(
                 random_vals = torch.rand_like(input_tensor)
                 
                 # Determine sign based on probability
-                output = torch.zeros_like(input_tensor, dtype=torch.int8)
+                output = torch.zeros_like(input_tensor)
                 output[random_vals < probs] = 1
                 output[random_vals >= probs] = -1
                 
@@ -112,5 +112,8 @@ def quantize(
             # Straight-through estimator: gradient passes through unchanged
             return grad_output, None, None
 
-    # Apply the quantization function
-    return QuantizeFunction.apply(x, method, threshold)
+    # Apply the quantization function and convert to int8
+    result = QuantizeFunction.apply(x, method, threshold)
+    # Convert to int8 for storage efficiency (this breaks gradient flow, so should
+    # be done after training or in eval mode)
+    return result.to(torch.int8)
