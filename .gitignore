@@ -56,7 +56,12 @@ Thumbs.db
 
 # Examples outputs
 /data/
-/models/
 /outputs/
 *.pth
 *.onnx
+
+# Model weights and checkpoints (but allow model zoo code)
+/models/checkpoints/
+/models/weights/
+/models/*.pth
+/models/*.onnx
