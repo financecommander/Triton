@@ -31,6 +31,10 @@ parsetab.py
 htmlcov/
 .tox/
 
+# Benchmark results
+tests/benchmarks/results/
+.benchmarks/
+
 # IDEs
 .vscode/
 .idea/
@@ -49,3 +53,10 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Examples outputs
+/data/
+/models/
+/outputs/
+*.pth
+*.onnx
