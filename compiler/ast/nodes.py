@@ -208,7 +208,9 @@ class ExprStatement(Statement):
 class Param(Node):
     """Function parameter."""
     name: str = field(kw_only=True)
-    type_annotation: Type = field(kw_only=True)
+    type_annotation: Optional[Type] = field(default=None, kw_only=True)
+    param_type: str = field(default="", kw_only=True)
+    shape: Optional[List[int]] = field(default=None, kw_only=True)
     
     def accept(self, visitor: "Visitor") -> Any:
         return visitor.visit_param(self)
