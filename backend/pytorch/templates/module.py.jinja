@@ -1,0 +1,39 @@
+"""
+PyTorch Module Template
+Generates a complete torch.nn.Module with ternary weights.
+"""
+import torch
+import torch.nn as nn
+from backend.pytorch.ops.pack import pack_ternary, unpack_ternary
+
+
+class {{ class_name }}(nn.Module):
+    """Generated PyTorch module with ternary weights."""
+    
+    def __init__(self):
+        super().__init__()
+        {% for param in parameters %}
+        # {{ param.name }}: shape {{ param.shape }}
+        self._{{ param.name }}_shape = {{ param.shape }}
+        self._{{ param.name }}_numel = {{ param.numel }}
+        
+        # Initialize with packed ternary values
+        init_tensor = torch.randint(-1, 2, ({{ param.numel }},), dtype=torch.int8)
+        packed = pack_ternary(init_tensor)
+        self.register_buffer('{{ param.name }}_packed', packed)
+        {% endfor %}
+    
+    def forward(self, {{ forward_args }}):
+        """Forward pass using ternary operations."""
+        {% for param in parameters %}
+        # Unpack {{ param.name }}
+        {{ param.name }} = unpack_ternary(
+            self.{{ param.name }}_packed, 
+            self._{{ param.name }}_numel
+        ).reshape(self._{{ param.name }}_shape)
+        {% endfor %}
+        
+        # Forward computation
+        {{ forward_body }}
+        
+        return {{ return_value }}

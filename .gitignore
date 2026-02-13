@@ -49,3 +49,10 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Examples outputs
+/data/
+/models/
+/outputs/
+*.pth
+*.onnx
