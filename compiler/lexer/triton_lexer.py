@@ -9,15 +9,7 @@ import ply.lex as lex
 
 
 class TernaryLexer:
-    """
-    Lexer for Triton DSL using PLY (Python Lex-Yacc).
-    
-    Example usage:
-        lexer = TernaryLexer()
-        lexer.input("let w: trit = 1")
-        for tok in lexer:
-            print(tok)
-    """
+    """Triton DSL Lexer using PLY"""
 
     # Reserved words
     reserved = {
@@ -34,11 +26,13 @@ class TernaryLexer:
 
     # Token list
     tokens = [
+        # Keywords
+        'LAYER', 'LET', 'FN', 'RETURN',
+        'TRIT', 'TERNARY_TENSOR',
+        'INT8', 'FLOAT16', 'FLOAT32',
+
         # Operators
-        'PLUS',
-        'MINUS',
-        'STAR',
-        'MATMUL',
+        'PLUS', 'MINUS', 'STAR', 'MATMUL',
         'ARROW',
         'ASSIGN',
 
@@ -57,7 +51,7 @@ class TernaryLexer:
         'RBRACKET',
         'COMMA',
         'COLON',
-    ] + list(reserved.values())
+    ]
 
     # Token rules (simple tokens)
     t_PLUS = r'\+'
