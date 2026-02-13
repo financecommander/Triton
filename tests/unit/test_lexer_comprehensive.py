@@ -91,15 +91,31 @@ class TestKeywordsComprehensive:
         assert tok.type == expected_type
         assert tok.value == keyword
 
+    def _get_expected_token_type(self, keyword):
+        """Helper to map keyword to expected token type."""
+        keyword_map = {
+            "layer": "LAYER",
+            "let": "LET",
+            "fn": "FN",
+            "return": "RETURN",
+            "trit": "TRIT",
+            "tensor": "TENSOR",
+            "TernaryTensor": "TERNARY_TENSOR",
+            "int8": "INT8",
+            "int32": "INT32",
+            "float16": "FLOAT16",
+            "float32": "FLOAT32",
+        }
+        return keyword_map[keyword]
+
     @pytest.mark.parametrize("keyword", [
         "layer", "let", "fn", "return", "trit", "tensor",
         "TernaryTensor", "int8", "int32", "float16", "float32"
     ])
     def test_keywords_with_whitespace(self, token_types, keyword):
         """Test keywords with surrounding whitespace."""
-        assert token_types(f"  {keyword}  ") == [keyword.upper() if keyword.islower() else
-                                                   "TERNARY_TENSOR" if keyword == "TernaryTensor"
-                                                   else keyword.upper().replace("TENSOR", "TENSOR")]
+        expected_type = self._get_expected_token_type(keyword)
+        assert token_types(f"  {keyword}  ") == [expected_type]
 
     @pytest.mark.parametrize("keyword", [
         "layer", "let", "fn", "return", "trit", "tensor",
@@ -670,12 +686,6 @@ class TestMalformedNumbers:
         tok = lexer.token()
         assert tok.type == "FLOAT"
 
-    def test_float_requires_decimal(self, token_types):
-        """Test that floats require digits after decimal."""
-        # Single digit followed by dot should be INTEGER then error
-        # This tests current behavior
-        pass  # Current lexer doesn't support "." as token
-
 
 class TestInvalidIdentifiers:
     """Tests for invalid identifier patterns."""
@@ -1181,11 +1191,17 @@ class TestRegressions:
         assert lexer.token() is None  # No more tokens
 
     def test_minus_vs_negative_in_expression(self, token_types):
-        """Regression: Distinguish - operator from -1 in expressions."""
-        # Note: Lexer treats -1 as single token when adjacent to identifier
+        """Regression: Lexer behavior for -1 in different contexts.
+        
+        The lexer's lookahead logic treats -1 as a single TRIT_LITERAL token
+        when the minus immediately precedes a '1', consuming both characters.
+        This happens regardless of what precedes the minus sign.
+        """
+        # With spaces around minus: separate tokens
         assert token_types("x - 1") == ["IDENTIFIER", "MINUS", "TRIT_LITERAL"]
-        assert token_types("x -1") == ["IDENTIFIER", "TRIT_LITERAL"]  # -1 is treated as TRIT_LITERAL
-        assert token_types("x-1") == ["IDENTIFIER", "TRIT_LITERAL"]  # -1 is treated as TRIT_LITERAL
+        # Without space after minus: -1 consumed as TRIT_LITERAL
+        assert token_types("x -1") == ["IDENTIFIER", "TRIT_LITERAL"]
+        assert token_types("x-1") == ["IDENTIFIER", "TRIT_LITERAL"]
 
     def test_arrow_vs_minus_gt(self, token_types):
         """Regression: -> should be single ARROW token."""
@@ -1214,20 +1230,4 @@ class TestRegressions:
         assert tok.value == 2
 
 
-# ============================================================================
-# SUMMARY STATISTICS
-# ============================================================================
 
-def test_suite_statistics():
-    """
-    Test suite statistics (not a real test, just for documentation).
-    
-    This comprehensive test suite includes:
-    - Token Recognition: 100+ test cases
-    - Error Handling: 50+ test cases
-    - Boundary Tests: 20+ test cases
-    - Performance Tests: 10+ test cases
-    - Integration Tests: 10+ test cases
-    - Total: 190+ test cases
-    """
-    pass
