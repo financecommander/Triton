@@ -34,7 +34,8 @@ precedence = (
 
 def p_program(p):
     """program : statement_list"""
-    p[0] = Program(p[1], lineno=p.lineno(1))
+    lineno = p[1][0].lineno if p[1] else 0
+    p[0] = Program(p[1], lineno=lineno)
 
 
 def p_statement_list(p):

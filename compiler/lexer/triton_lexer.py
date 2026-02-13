@@ -46,7 +46,6 @@ tokens = [
 t_PLUS = r"\+"
 t_TIMES = r"\*"
 t_MATMUL = r"@"
-t_ARROW = r"->"
 t_ASSIGN = r"="
 t_LPAREN = r"\("
 t_RPAREN = r"\)"
@@ -58,6 +57,11 @@ t_COMMA = r","
 t_COLON = r":"
 t_SEMICOLON = r";"
 t_MINUS = r"-"
+
+
+def t_ARROW(t):
+    r"->"
+    return t
 
 # Ignored characters (spaces and tabs)
 t_ignore = " \t"
