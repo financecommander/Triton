@@ -5,27 +5,24 @@ Represents the structure of parsed Triton programs.
 
 from dataclasses import dataclass, field
 from typing import List, Optional, Any, Dict
-from abc import ABC, abstractmethod
+from abc import ABC
 
 
 @dataclass
-class Node(ABC):
+class Node:
     """Base class for all AST nodes with location information."""
     
-    @abstractmethod
+    # Location information - keyword-only so subclass fields come first positionally
+    lineno: int = field(default=0, kw_only=True)
+    col_offset: int = field(default=0, kw_only=True)
+    
     def accept(self, visitor: "Visitor") -> Any:
         """Accept a visitor for the visitor pattern."""
-        pass
-    
-    # Location information for error reporting.
-    # Defaults to 0 to allow easier test node creation and avoid None checks.
-    # Parser should always set these to actual values from source.
-    lineno: int = 0
-    col_offset: int = 0
+        return None
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert node to dictionary for debugging."""
-        result = {"type": self.__class__.__name__}
+        result = {"node_type": self.__class__.__name__}
         for key, value in self.__dict__.items():
             if isinstance(value, Node):
                 result[key] = value.to_dict()
@@ -43,13 +40,20 @@ class Node(ABC):
 # Type nodes
 @dataclass
 class Type(Node):
-    """Base class for type nodes."""
-    pass
+    """Base/simple type node. Can hold a type name string for simple types."""
+    name: str = ""
+    
+    def accept(self, visitor: "Visitor") -> Any:
+        return None
 
 
 @dataclass
 class TritType(Type):
     """Ternary type: {-1, 0, 1}."""
+    
+    def __post_init__(self):
+        if not self.name:
+            self.name = "trit"
     
     def accept(self, visitor: "Visitor") -> Any:
         return visitor.visit_trit_type(self)
@@ -58,7 +62,11 @@ class TritType(Type):
 @dataclass
 class IntType(Type):
     """Integer type."""
-    bits: int = 32  # int8, int32, etc.
+    bits: int = 32
+    
+    def __post_init__(self):
+        if not self.name:
+            self.name = f"int{self.bits}"
     
     def accept(self, visitor: "Visitor") -> Any:
         return visitor.visit_int_type(self)
@@ -67,7 +75,11 @@ class IntType(Type):
 @dataclass
 class FloatType(Type):
     """Floating point type."""
-    bits: int = 32  # float16, float32
+    bits: int = 32
+    
+    def __post_init__(self):
+        if not self.name:
+            self.name = f"float{self.bits}"
     
     def accept(self, visitor: "Visitor") -> Any:
         return visitor.visit_float_type(self)
@@ -76,8 +88,12 @@ class FloatType(Type):
 @dataclass
 class TensorType(Type):
     """Tensor type with element type and shape."""
-    element_type: Type = field(kw_only=True)
-    shape: Optional[List[int]] = field(default=None, kw_only=True)
+    element_type: Optional["Type"] = None
+    shape: Optional[List[int]] = None
+    
+    def __post_init__(self):
+        if not self.name:
+            self.name = "tensor"
     
     def accept(self, visitor: "Visitor") -> Any:
         return visitor.visit_tensor_type(self)
@@ -93,7 +109,7 @@ class Expr(Node):
 @dataclass
 class TritLiteral(Expr):
     """Trit literal: -1, 0, or 1."""
-    value: int = field(kw_only=True)
+    value: int = 0
     
     def accept(self, visitor: "Visitor") -> Any:
         return visitor.visit_trit_literal(self)
@@ -102,7 +118,7 @@ class TritLiteral(Expr):
 @dataclass
 class IntLiteral(Expr):
     """Integer literal."""
-    value: int = field(kw_only=True)
+    value: int = 0
     
     def accept(self, visitor: "Visitor") -> Any:
         return visitor.visit_int_literal(self)
@@ -111,7 +127,7 @@ class IntLiteral(Expr):
 @dataclass
 class FloatLiteral(Expr):
     """Float literal."""
-    value: float = field(kw_only=True)
+    value: float = 0.0
     
     def accept(self, visitor: "Visitor") -> Any:
         return visitor.visit_float_literal(self)
@@ -120,8 +136,8 @@ class FloatLiteral(Expr):
 @dataclass
 class TernaryTensor(Expr):
     """Ternary tensor with shape and values."""
-    shape: List[int] = field(kw_only=True)
-    values: List[int] = field(kw_only=True)
+    shape: List[int] = field(default_factory=list)
+    values: List[int] = field(default_factory=list)
     
     def accept(self, visitor: "Visitor") -> Any:
         return visitor.visit_ternary_tensor(self)
@@ -130,7 +146,7 @@ class TernaryTensor(Expr):
 @dataclass
 class Identifier(Expr):
     """Variable or function identifier."""
-    name: str = field(kw_only=True)
+    name: str = ""
     
     def accept(self, visitor: "Visitor") -> Any:
         return visitor.visit_identifier(self)
@@ -139,9 +155,9 @@ class Identifier(Expr):
 @dataclass
 class BinaryOp(Expr):
     """Binary operation."""
-    left: Expr = field(kw_only=True)
-    op: str = field(kw_only=True)  # +, -, *, /, @, etc.
-    right: Expr = field(kw_only=True)
+    left: Optional[Expr] = None
+    op: str = ""
+    right: Optional[Expr] = None
     
     def accept(self, visitor: "Visitor") -> Any:
         return visitor.visit_binary_op(self)
@@ -150,8 +166,8 @@ class BinaryOp(Expr):
 @dataclass
 class UnaryOp(Expr):
     """Unary operation."""
-    op: str = field(kw_only=True)  # -, +, not
-    operand: Expr = field(kw_only=True)
+    op: str = ""
+    operand: Optional[Expr] = None
     
     def accept(self, visitor: "Visitor") -> Any:
         return visitor.visit_unary_op(self)
@@ -160,8 +176,8 @@ class UnaryOp(Expr):
 @dataclass
 class FunctionCall(Expr):
     """Function call."""
-    name: str = field(kw_only=True)
-    args: List[Expr] = field(kw_only=True)
+    name: str = ""
+    args: List[Expr] = field(default_factory=list)
     
     def accept(self, visitor: "Visitor") -> Any:
         return visitor.visit_function_call(self)
@@ -177,9 +193,27 @@ class Statement(Node):
 @dataclass
 class Assignment(Statement):
     """Assignment statement."""
-    target: str = field(kw_only=True)
-    value: Expr = field(kw_only=True)
-    type_annotation: Optional[Type] = field(default=None, kw_only=True)
+    name: str = ""
+    value: Optional[Expr] = None
+    type_annotation: Optional[Type] = None
+    
+    def __init__(self, name="", value=None, type_annotation=None, *, target=None, lineno=0, col_offset=0):
+        # Accept 'target' as alias for 'name'
+        if target is not None:
+            name = target
+        self.name = name
+        self.value = value
+        self.type_annotation = type_annotation
+        self.lineno = lineno
+        self.col_offset = col_offset
+    
+    @property
+    def target(self):
+        return self.name
+    
+    @target.setter
+    def target(self, val):
+        self.name = val
     
     def accept(self, visitor: "Visitor") -> Any:
         return visitor.visit_assignment(self)
@@ -188,7 +222,7 @@ class Assignment(Statement):
 @dataclass
 class Return(Statement):
     """Return statement."""
-    value: Optional[Expr] = field(default=None, kw_only=True)
+    value: Optional[Expr] = None
     
     def accept(self, visitor: "Visitor") -> Any:
         return visitor.visit_return(self)
@@ -197,7 +231,7 @@ class Return(Statement):
 @dataclass
 class ExprStatement(Statement):
     """Expression as a statement."""
-    expr: Expr = field(kw_only=True)
+    expr: Optional[Expr] = None
     
     def accept(self, visitor: "Visitor") -> Any:
         return visitor.visit_expr_statement(self)
@@ -206,27 +240,34 @@ class ExprStatement(Statement):
 # Function and layer definitions
 @dataclass
 class Param(Node):
-    """Function parameter.
-    
-    For type checking: use type_annotation (Type node).
-    For code generation: use param_type (string) and shape.
-    """
-    name: str = field(kw_only=True)
-    type_annotation: Optional[Type] = field(default=None, kw_only=True)
-    param_type: Optional[str] = field(default=None, kw_only=True)
-    shape: Optional[List[int]] = field(default=None, kw_only=True)
+    """Function parameter."""
+    name: str = ""
+    type_annotation: Optional[Type] = None
+    param_type: Optional[str] = None
+    shape: Optional[List[int]] = None
     
     def accept(self, visitor: "Visitor") -> Any:
         return visitor.visit_param(self)
 
 
 @dataclass
+class Declaration(Statement):
+    """Variable declaration statement."""
+    name: str = ""
+    var_type: Optional[Type] = None
+    initializer: Optional[Expr] = None
+    
+    def accept(self, visitor: "Visitor") -> Any:
+        return visitor.visit_declaration(self)
+
+
+@dataclass
 class FunctionDef(Statement):
     """Function definition."""
-    name: str = field(kw_only=True)
-    params: List[Param] = field(kw_only=True)
-    return_type: Optional[Type] = field(kw_only=True)
-    body: List[Statement] = field(kw_only=True)
+    name: str = ""
+    params: List[Param] = field(default_factory=list)
+    return_type: Optional[Type] = None
+    body: List[Statement] = field(default_factory=list)
     
     def accept(self, visitor: "Visitor") -> Any:
         return visitor.visit_function_def(self)
@@ -235,9 +276,10 @@ class FunctionDef(Statement):
 @dataclass
 class LayerDef(Statement):
     """Layer definition (similar to function but for neural network layers)."""
-    name: str = field(kw_only=True)
-    params: List[Param] = field(kw_only=True)
-    body: List[Statement] = field(kw_only=True)
+    name: str = ""
+    params: List[Param] = field(default_factory=list)
+    return_type: Optional[Type] = None
+    body: List[Statement] = field(default_factory=list)
     
     def accept(self, visitor: "Visitor") -> Any:
         return visitor.visit_layer_def(self)
@@ -308,8 +350,17 @@ class Visitor(ABC):
     def visit_param(self, node: Param) -> Any:
         pass
     
+    def visit_declaration(self, node: Declaration) -> Any:
+        pass
+    
     def visit_function_def(self, node: FunctionDef) -> Any:
         pass
     
     def visit_layer_def(self, node: LayerDef) -> Any:
         pass
+
+
+# Aliases for backward compatibility
+Expression = Expr
+IntegerLiteral = IntLiteral
+ReturnStmt = Return

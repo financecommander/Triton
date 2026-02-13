@@ -1,0 +1,13 @@
+# Triton DSL Test Program
+let w: trit = 1
+let x: trit = -1
+let z: trit = 0
+
+layer SimpleTernary(in_features: int, out_features: int) -> TernaryTensor {
+    let W: TernaryTensor = random_ternary([out_features, in_features])
+    
+    fn forward(x: Tensor[float16]) -> Tensor[float16] {
+        let output = ternary_matmul(x, W)
+        return output
+    }
+}
