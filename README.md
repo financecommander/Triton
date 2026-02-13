@@ -97,6 +97,36 @@ python examples/test_mnist_ternary.py
 - Model size: ~0.06 MB (16x smaller than float32)
 - Inference: 2-3x faster on optimized hardware
 
+### Model Export & Publishing
+
+Export and publish your trained ternary models:
+
+```bash
+# Install export dependencies
+pip install -e ".[export]"
+
+# Export to ONNX
+python models/scripts/publish_model.py \
+    --model resnet18 \
+    --checkpoint model.pth \
+    --export-onnx
+
+# Publish to Hugging Face Hub
+python models/scripts/publish_model.py \
+    --model resnet18 \
+    --checkpoint model.pth \
+    --hf-repo username/ternary-resnet18
+
+# Create GitHub Release
+python models/scripts/publish_model.py \
+    --model resnet18 \
+    --checkpoint model.pth \
+    --github-release v1.0.0 \
+    --github-repo username/Triton
+```
+
+See [Export Guide](docs/EXPORT_GUIDE.md) for detailed documentation.
+
 ### Compiler Development
 
 ```bash
@@ -114,6 +144,7 @@ triton compile examples/mnist_ternary.tri --output model.py
 
 - [Technical Specification](docs/specs/TECHNICAL_SPEC.md)
 - [Grammar Reference](docs/specs/GRAMMAR.md)
+- [Export & Publishing Guide](docs/EXPORT_GUIDE.md)
 - [API Documentation](docs/api/)
 
 ## Contributing

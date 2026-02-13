@@ -57,6 +57,7 @@ Thumbs.db
 # Examples outputs
 /data/
 /outputs/
+/example_exports/
 *.pth
 *.onnx
 

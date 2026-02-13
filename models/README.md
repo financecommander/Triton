@@ -212,6 +212,10 @@ for epoch in range(100):
 - [x] Training scripts
 - [x] Benchmarking tools
 - [x] Packaging utilities
+- [x] ONNX export support
+- [x] Hugging Face Hub integration
+- [x] GitHub Releases publishing
+- [x] Model Zoo registry
 
 ### 🚧 In Progress
 - [ ] BERT-tiny (ternary)
@@ -219,10 +223,49 @@ for epoch in range(100):
 - [ ] Model conversion tools
 
 ### 📋 Planned
-- [ ] ONNX export support
 - [ ] TensorRT optimization
 - [ ] Mobile deployment (TFLite)
 - [ ] Web deployment (ONNX.js)
+
+## 🚀 Publishing Models
+
+### Export to ONNX
+
+```bash
+python models/scripts/publish_model.py \
+    --model resnet18 \
+    --checkpoint best_model.pth \
+    --export-onnx \
+    --onnx-validate \
+    --output exports/
+```
+
+### Publish to Hugging Face Hub
+
+```bash
+# Install export dependencies
+pip install -e ".[export]"
+
+# Publish model
+python models/scripts/publish_model.py \
+    --model resnet18 \
+    --checkpoint best_model.pth \
+    --hf-repo username/ternary-resnet18-cifar10 \
+    --hf-token $HF_TOKEN
+```
+
+### Create GitHub Release
+
+```bash
+python models/scripts/publish_model.py \
+    --model resnet18 \
+    --checkpoint best_model.pth \
+    --github-release v1.0.0 \
+    --github-repo username/Triton \
+    --github-token $GITHUB_TOKEN
+```
+
+See [Export Guide](../docs/EXPORT_GUIDE.md) for detailed documentation.
 
 ## 🤝 Contributing
 
