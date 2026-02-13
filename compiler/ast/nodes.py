@@ -206,9 +206,15 @@ class ExprStatement(Statement):
 # Function and layer definitions
 @dataclass
 class Param(Node):
-    """Function parameter."""
+    """Function parameter.
+    
+    For type checking: use type_annotation (Type node).
+    For code generation: use param_type (string) and shape.
+    """
     name: str = field(kw_only=True)
-    type_annotation: Type = field(kw_only=True)
+    type_annotation: Optional[Type] = field(default=None, kw_only=True)
+    param_type: Optional[str] = field(default=None, kw_only=True)
+    shape: Optional[List[int]] = field(default=None, kw_only=True)
     
     def accept(self, visitor: "Visitor") -> Any:
         return visitor.visit_param(self)
