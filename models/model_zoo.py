@@ -12,6 +12,8 @@ import warnings
 
 
 # Model Zoo Registry
+# Note: URLs use placeholder tags. Actual releases should be created
+# using the publish_model.py script with appropriate version tags.
 MODEL_ZOO = {
     'ternary_resnet18_cifar10': {
         'architecture': 'ternary_resnet18',
@@ -25,7 +27,7 @@ MODEL_ZOO = {
             'compression_ratio': 16.0
         },
         'urls': {
-            'github': 'https://github.com/financecommander/Triton/releases/download/models/ternary_resnet18_cifar10.pth',
+            'github': 'https://github.com/financecommander/Triton/releases/download/v1.0.0-resnet18-cifar10/ternary_resnet18_cifar10.pth',
             'huggingface': 'financecommander/ternary-resnet18-cifar10',
         }
     },
@@ -41,7 +43,7 @@ MODEL_ZOO = {
             'compression_ratio': 16.0
         },
         'urls': {
-            'github': 'https://github.com/financecommander/Triton/releases/download/models/ternary_resnet18_imagenet.pth',
+            'github': 'https://github.com/financecommander/Triton/releases/download/v1.0.0-resnet18-imagenet/ternary_resnet18_imagenet.pth',
             'huggingface': 'financecommander/ternary-resnet18-imagenet',
         }
     },
@@ -57,7 +59,7 @@ MODEL_ZOO = {
             'compression_ratio': 16.0
         },
         'urls': {
-            'github': 'https://github.com/financecommander/Triton/releases/download/models/ternary_mobilenetv2_imagenet.pth',
+            'github': 'https://github.com/financecommander/Triton/releases/download/v1.0.0-mobilenetv2-imagenet/ternary_mobilenetv2_imagenet.pth',
             'huggingface': 'financecommander/ternary-mobilenetv2-imagenet',
         }
     },

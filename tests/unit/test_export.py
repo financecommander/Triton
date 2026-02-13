@@ -115,7 +115,7 @@ class TestONNXExport:
             assert output_path.exists(), f"ONNX file for opset {opset} should be created"
     
     @pytest.mark.skipif(
-        not pytest.importorskip("onnxruntime", reason="onnxruntime not installed"),
+        pytest.importorskip("onnxruntime", reason="onnxruntime not installed") is None,
         reason="onnxruntime required for validation"
     )
     def test_validate_onnx_model(self, simple_model, temp_dir):

@@ -213,6 +213,10 @@ def optimize_onnx_model(
     Applies various optimizations like constant folding, operator fusion,
     and graph simplification. Requires onnx and onnxruntime to be installed.
     
+    Note: This function uses generic ONNX optimization which may not be 
+    optimal for all model types. For production use, consider model-specific
+    optimization tools.
+    
     Args:
         input_path: Path to input ONNX model
         output_path: Path to save optimized model (default: overwrite input)
@@ -242,10 +246,12 @@ def optimize_onnx_model(
         # Load model
         model = onnx.load(str(input_path))
         
-        # Apply optimizations
+        # Apply generic optimizations
+        # Note: Using 'bert' model_type applies general-purpose optimizations
+        # that work across different architectures
         optimized_model = optimizer.optimize_model(
             str(input_path),
-            model_type='bert',  # Generic optimization
+            model_type='bert',  # Generic optimization (not model-specific)
             num_heads=0,
             hidden_size=0,
         )
