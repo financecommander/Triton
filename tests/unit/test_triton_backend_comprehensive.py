@@ -126,19 +126,23 @@ def measure_memory_usage() -> int:
 class TestAutoTuning:
     """Test auto-tuning configurations and performance."""
     
-    @pytest.mark.skipif(not TRITON_AVAILABLE or not HAS_CUDA, 
+    @pytest.mark.skipif(not TRITON_AVAILABLE or not HAS_CUDA,
                        reason="Triton and CUDA required")
-    @pytest.mark.parametrize("block_size", [16, 32, 64, 128, 256])
-    def test_block_size_configurations(self, block_size):
-        """Test that each block size configuration works."""
-        # Create small test matrices
-        size = block_size * 2
-        a = create_ternary_matrix(size, size)
-        b = create_ternary_matrix(size, size)
+    @pytest.mark.parametrize("block_size,matrix_size", [
+        (16, 32), (16, 64), (16, 128),
+        (32, 64), (32, 128), (32, 256),
+        (64, 128), (64, 256), (64, 512),
+        (128, 256), (128, 512), (128, 1024),
+        (256, 512), (256, 1024),
+    ])
+    def test_block_size_configurations(self, block_size, matrix_size):
+        """Test that each block size configuration works with various matrix sizes."""
+        a = create_ternary_matrix(matrix_size, matrix_size)
+        b = create_ternary_matrix(matrix_size, matrix_size)
         
         # Should not raise any errors
         result = ternary_matmul_triton(a, b)
-        assert result.shape == (size, size)
+        assert result.shape == (matrix_size, matrix_size)
     
     @pytest.mark.skipif(not TRITON_AVAILABLE or not HAS_CUDA,
                        reason="Triton and CUDA required")
@@ -233,7 +237,9 @@ class TestAutoTuning:
 class TestCorrectnessBasic:
     """Basic correctness tests for ternary operations."""
     
-    @pytest.mark.parametrize("size", [1, 16, 64, 256, 1024])
+    @pytest.mark.parametrize("size", [
+        1, 2, 4, 8, 16, 32, 64, 96, 128, 192, 256, 384, 512, 768, 1024, 1536, 2048
+    ])
     def test_matmul_accuracy_square(self, size, random_seed):
         """Test matrix multiplication accuracy for square matrices."""
         device = torch.device('cuda' if HAS_CUDA and TRITON_AVAILABLE else 'cpu')
@@ -253,10 +259,11 @@ class TestCorrectnessBasic:
         assert torch.equal(result, expected)
     
     @pytest.mark.parametrize("m,n,k", [
-        (128, 256, 128),
-        (256, 128, 256),
-        (64, 128, 256),
-        (512, 256, 128),
+        (16, 32, 16), (32, 16, 32), (16, 64, 32),
+        (64, 32, 64), (32, 128, 64), (128, 32, 128),
+        (64, 128, 64), (128, 64, 128), (64, 256, 128),
+        (128, 256, 128), (256, 128, 256), (128, 512, 256),
+        (256, 512, 256), (512, 256, 512), (256, 1024, 512),
     ])
     def test_matmul_accuracy_nonsquare(self, m, n, k, random_seed):
         """Test matrix multiplication for non-square matrices."""
@@ -309,7 +316,9 @@ class TestCorrectnessBasic:
         # Check the packed byte value
         assert packed[0].item() == expected_byte
     
-    @pytest.mark.parametrize("size", [4, 8, 16, 64, 256])
+    @pytest.mark.parametrize("size", [
+        4, 8, 12, 16, 20, 24, 32, 48, 64, 96, 128, 192, 256, 384, 512
+    ])
     def test_pack_unpack_roundtrip(self, size, random_seed):
         """Test that pack followed by unpack returns original values."""
         device = torch.device('cuda' if HAS_CUDA and TRITON_AVAILABLE else 'cpu')
@@ -396,11 +405,14 @@ class TestCorrectnessEdgeCases:
         
         assert torch.equal(result, expected)
     
-    @pytest.mark.parametrize("sparsity", [0.25, 0.5, 0.75, 0.9])
-    def test_sparse_matrices(self, sparsity, random_seed):
-        """Test matrices with varying sparsity levels."""
+    @pytest.mark.parametrize("sparsity,size", [
+        (0.1, 64), (0.25, 64), (0.5, 64), (0.75, 64), (0.9, 64),
+        (0.1, 128), (0.25, 128), (0.5, 128), (0.75, 128), (0.9, 128),
+        (0.1, 256), (0.25, 256), (0.5, 256), (0.75, 256), (0.9, 256),
+    ])
+    def test_sparse_matrices(self, sparsity, size, random_seed):
+        """Test matrices with varying sparsity levels and sizes."""
         device = torch.device('cuda' if HAS_CUDA and TRITON_AVAILABLE else 'cpu')
-        size = 128
         a = create_ternary_matrix(size, size, device=device, sparsity=sparsity)
         b = create_ternary_matrix(size, size, device=device, sparsity=sparsity)
         
@@ -468,9 +480,9 @@ class TestCorrectnessLargeSizes:
 class TestCorrectnessRandom:
     """Test with random ternary matrices."""
     
-    @pytest.mark.parametrize("trial", range(20))
+    @pytest.mark.parametrize("trial", range(30))
     def test_random_small_matrices(self, trial, random_seed):
-        """Test with 20 random small matrices."""
+        """Test with 30 random small matrices."""
         torch.manual_seed(42 + trial)
         device = torch.device('cuda' if HAS_CUDA and TRITON_AVAILABLE else 'cpu')
         
@@ -487,9 +499,9 @@ class TestCorrectnessRandom:
         
         assert torch.equal(result, expected)
     
-    @pytest.mark.parametrize("trial", range(10))
+    @pytest.mark.parametrize("trial", range(20))
     def test_random_nonsquare_matrices(self, trial, random_seed):
-        """Test with 10 random non-square matrices."""
+        """Test with 20 random non-square matrices."""
         torch.manual_seed(100 + trial)
         device = torch.device('cuda' if HAS_CUDA and TRITON_AVAILABLE else 'cpu')
         
@@ -513,11 +525,15 @@ class TestCorrectnessRandom:
 class TestCorrectnessBatch:
     """Test batch matrix multiplication."""
     
-    @pytest.mark.parametrize("batch_size", [2, 4, 8])
-    def test_batch_matmul_loop(self, batch_size, random_seed):
-        """Test batch processing by looping."""
+    @pytest.mark.parametrize("batch_size,size", [
+        (2, 32), (2, 64), (2, 128),
+        (4, 32), (4, 64), (4, 128),
+        (8, 32), (8, 64), (8, 128),
+        (16, 32), (16, 64),
+    ])
+    def test_batch_matmul_loop(self, batch_size, size, random_seed):
+        """Test batch processing by looping with various configurations."""
         device = torch.device('cuda' if HAS_CUDA and TRITON_AVAILABLE else 'cpu')
-        size = 64
         
         # Create batches
         a_batch = [create_ternary_matrix(size, size, device=device) 
@@ -552,7 +568,7 @@ class TestPerformanceThroughput:
     
     @pytest.mark.skipif(not TRITON_AVAILABLE or not HAS_CUDA,
                        reason="Triton and CUDA required")
-    @pytest.mark.parametrize("size", [256, 512, 1024])
+    @pytest.mark.parametrize("size", [128, 256, 384, 512, 768, 1024, 1536, 2048])
     def test_throughput_measurement(self, size, benchmark):
         """Measure throughput for different matrix sizes."""
         device = torch.device('cuda')
@@ -633,7 +649,7 @@ class TestPerformanceScaling:
     
     @pytest.mark.skipif(not TRITON_AVAILABLE or not HAS_CUDA,
                        reason="Triton and CUDA required")
-    @pytest.mark.parametrize("size", [64, 128, 256, 512])
+    @pytest.mark.parametrize("size", [32, 64, 96, 128, 192, 256, 384, 512, 768, 1024])
     def test_scaling_with_size(self, size):
         """Test that performance scales with matrix size."""
         device = torch.device('cuda')
