@@ -1,265 +1,373 @@
 """
-Benchmark script for ternary matrix multiplication
+Benchmark: Matrix Multiplication Performance
 
-This script compares the performance of the optimized CUDA ternary matmul
-kernel against standard PyTorch operations.
+Compares ternary_matmul vs torch.matmul (float32) across different matrix sizes
+and sparsity levels.
+
+Metrics:
+- GFLOPS (effective operations per second)
+- Memory bandwidth (GB/s)
+- Latency (ms)
+
+Usage:
+    pytest tests/benchmarks/bench_matmul.py --benchmark-json=results/matmul_results.json
 """
 
+import os
+import json
 import time
+from pathlib import Path
+from typing import Dict, List, Tuple
+
+import pytest
 import torch
 import numpy as np
-from typing import Tuple, List
-import sys
-import os
+import matplotlib.pyplot as plt
+import pandas as pd
+from scipy import stats
 
 # Add parent directory to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../..'))
+import sys
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-try:
-    from kernels.cuda.ternary_ops import ternary_matmul, get_ternary_matmul
-    CUDA_AVAILABLE = True
-except Exception as e:
-    print(f"Warning: Could not import CUDA operations: {e}")
-    CUDA_AVAILABLE = False
+from backend.pytorch.ternary_tensor import ternary_matmul, TernaryTensor
 
 
-def generate_ternary_matrix(M: int, N: int, device: str = 'cpu') -> torch.Tensor:
-    """
-    Generate a random ternary matrix with values in {-1, 0, 1}.
-    
-    Args:
-        M: Number of rows
-        N: Number of columns
-        device: Device to create tensor on
-    
-    Returns:
-        Ternary matrix
-    """
-    # Generate random integers in {-1, 0, 1}
-    matrix = torch.randint(-1, 2, (M, N), dtype=torch.int8, device=device)
+# Test configurations
+MATRIX_SIZES = [128, 256, 512, 1024, 2048]
+SPARSITY_LEVELS = [0.0, 0.25, 0.5, 0.75]  # Percentage of zeros
+DEVICES = ['cpu', 'cuda'] if torch.cuda.is_available() else ['cpu']
+N_WARMUP = 5
+N_ITERATIONS = 20
+
+
+def create_sparse_matrix(size: int, sparsity: float, device: str) -> torch.Tensor:
+    """Create a matrix with specified sparsity level."""
+    matrix = torch.randn(size, size, device=device)
+    if sparsity > 0:
+        mask = torch.rand(size, size, device=device) > sparsity
+        matrix = matrix * mask.float()
     return matrix
 
 
-def naive_ternary_matmul(A: torch.Tensor, B: torch.Tensor) -> torch.Tensor:
-    """
-    Naive implementation of ternary matrix multiplication using PyTorch.
-    
-    Args:
-        A: Matrix A (M x K)
-        B: Matrix B (K x N)
-    
-    Returns:
-        Result matrix C (M x N)
-    """
-    return torch.matmul(A.to(torch.float32), B.to(torch.float32)).to(torch.int16)
+def measure_gflops(size: int, elapsed_time: float) -> float:
+    """Calculate GFLOPS (billion floating point operations per second)."""
+    # Matrix multiplication: 2 * N^3 operations (multiply and add)
+    flops = 2 * size ** 3
+    gflops = (flops / elapsed_time) / 1e9
+    return gflops
 
 
-def benchmark_operation(
-    func,
-    A: torch.Tensor,
-    B: torch.Tensor,
-    warmup_iters: int = 5,
-    benchmark_iters: int = 20
-) -> Tuple[float, torch.Tensor]:
+def measure_bandwidth(size: int, elapsed_time: float, dtype_bytes: int = 4) -> float:
+    """Calculate memory bandwidth in GB/s."""
+    # Two input matrices + one output matrix
+    total_bytes = 3 * size * size * dtype_bytes
+    bandwidth_gbs = (total_bytes / elapsed_time) / 1e9
+    return bandwidth_gbs
+
+
+def benchmark_matmul(matrix_a: torch.Tensor, matrix_b: torch.Tensor, 
+                     use_ternary: bool = False) -> Tuple[float, Dict]:
     """
-    Benchmark an operation.
-    
-    Args:
-        func: Function to benchmark
-        A: Matrix A
-        B: Matrix B
-        warmup_iters: Number of warmup iterations
-        benchmark_iters: Number of benchmark iterations
+    Benchmark matrix multiplication.
     
     Returns:
-        Tuple of (average time in ms, result)
+        Tuple of (mean_time_ms, metrics_dict)
     """
+    device = matrix_a.device
+    size = matrix_a.shape[0]
+    
     # Warmup
-    for _ in range(warmup_iters):
-        result = func(A, B)
+    for _ in range(N_WARMUP):
+        if use_ternary:
+            _ = ternary_matmul(matrix_a, matrix_b)
+        else:
+            _ = torch.matmul(matrix_a, matrix_b)
     
-    if A.is_cuda:
+    # Synchronize for accurate timing (especially important for CUDA)
+    if device.type == 'cuda':
         torch.cuda.synchronize()
     
     # Benchmark
     times = []
-    for _ in range(benchmark_iters):
+    for _ in range(N_ITERATIONS):
         start = time.perf_counter()
-        result = func(A, B)
-        if A.is_cuda:
+        
+        if use_ternary:
+            result = ternary_matmul(matrix_a, matrix_b)
+        else:
+            result = torch.matmul(matrix_a, matrix_b)
+        
+        if device.type == 'cuda':
             torch.cuda.synchronize()
-        end = time.perf_counter()
-        times.append((end - start) * 1000)  # Convert to ms
+        
+        elapsed = time.perf_counter() - start
+        times.append(elapsed * 1000)  # Convert to ms
     
-    avg_time = np.mean(times)
-    std_time = np.std(times)
+    times_array = np.array(times)
+    mean_time = np.mean(times_array)
+    std_time = np.std(times_array)
     
-    return avg_time, std_time, result
+    # Calculate metrics
+    gflops = measure_gflops(size, mean_time / 1000)
+    bandwidth = measure_bandwidth(size, mean_time / 1000)
+    
+    metrics = {
+        'mean_ms': mean_time,
+        'std_ms': std_time,
+        'median_ms': np.median(times_array),
+        'min_ms': np.min(times_array),
+        'max_ms': np.max(times_array),
+        'gflops': gflops,
+        'bandwidth_gbs': bandwidth,
+    }
+    
+    return mean_time, metrics
 
 
-def verify_correctness(
-    A: torch.Tensor,
-    B: torch.Tensor,
-    result_cuda: torch.Tensor,
-    result_naive: torch.Tensor,
-    tolerance: float = 1e-3
-) -> bool:
-    """
-    Verify that CUDA result matches naive implementation.
+class TestMatMulBenchmark:
+    """Matrix multiplication benchmark suite."""
     
-    Args:
-        A: Matrix A
-        B: Matrix B
-        result_cuda: Result from CUDA kernel
-        result_naive: Result from naive implementation
-        tolerance: Relative tolerance for comparison
+    @pytest.mark.parametrize("size", MATRIX_SIZES)
+    @pytest.mark.parametrize("device", DEVICES)
+    @pytest.mark.parametrize("sparsity", SPARSITY_LEVELS)
+    def test_matmul_float32(self, benchmark, size, device, sparsity):
+        """Benchmark standard float32 matmul."""
+        matrix_a = create_sparse_matrix(size, sparsity, device)
+        matrix_b = create_sparse_matrix(size, sparsity, device)
+        
+        def run_matmul():
+            return torch.matmul(matrix_a, matrix_b)
+        
+        result = benchmark.pedantic(run_matmul, rounds=N_ITERATIONS, warmup_rounds=N_WARMUP)
     
-    Returns:
-        True if results match
-    """
-    diff = torch.abs(result_cuda.float() - result_naive.float())
-    max_diff = torch.max(diff).item()
-    mean_diff = torch.mean(diff).item()
-    
-    print(f"  Max difference: {max_diff:.6f}")
-    print(f"  Mean difference: {mean_diff:.6f}")
-    
-    # Check if all values are close
-    matches = torch.allclose(
-        result_cuda.float(),
-        result_naive.float(),
-        rtol=tolerance,
-        atol=1.0
-    )
-    
-    return matches
+    @pytest.mark.parametrize("size", MATRIX_SIZES)
+    @pytest.mark.parametrize("device", DEVICES)
+    @pytest.mark.parametrize("sparsity", SPARSITY_LEVELS)
+    def test_matmul_ternary(self, benchmark, size, device, sparsity):
+        """Benchmark ternary matmul."""
+        matrix_a = create_sparse_matrix(size, sparsity, device)
+        matrix_b = create_sparse_matrix(size, sparsity, device)
+        
+        def run_matmul():
+            return ternary_matmul(matrix_a, matrix_b)
+        
+        result = benchmark.pedantic(run_matmul, rounds=N_ITERATIONS, warmup_rounds=N_WARMUP)
 
 
-def run_benchmark_suite():
-    """Run a comprehensive benchmark suite."""
-    print("=" * 80)
-    print("Ternary Matrix Multiplication Benchmark")
-    print("=" * 80)
-    print()
+def generate_comparison_report():
+    """Generate detailed comparison report with visualizations."""
+    results = []
     
-    # Check CUDA availability
-    if not torch.cuda.is_available():
-        print("CUDA not available. Running CPU-only benchmarks.")
-        device = 'cpu'
-    else:
-        print(f"CUDA available: {torch.cuda.get_device_name(0)}")
-        device = 'cuda'
+    print("\n" + "="*80)
+    print("MATRIX MULTIPLICATION BENCHMARK REPORT")
+    print("="*80)
     
-    if not CUDA_AVAILABLE and device == 'cuda':
-        print("Warning: CUDA operations not available. Skipping CUDA benchmarks.")
-        device = 'cpu'
-    
-    print()
-    
-    # Test sizes: (M, K, N)
-    test_sizes = [
-        (64, 64, 64),
-        (128, 128, 128),
-        (256, 256, 256),
-        (512, 512, 512),
-        (1024, 1024, 1024),
-    ]
-    
-    print(f"Device: {device}")
-    print()
-    
-    for M, K, N in test_sizes:
-        print(f"Matrix dimensions: ({M} x {K}) @ ({K} x {N})")
+    for device in DEVICES:
+        print(f"\nDevice: {device.upper()}")
         print("-" * 80)
         
-        # Generate test matrices
-        A = generate_ternary_matrix(M, K, device=device)
-        B = generate_ternary_matrix(K, N, device=device)
-        
-        # Benchmark naive implementation
-        avg_time_naive, std_time_naive, result_naive = benchmark_operation(
-            naive_ternary_matmul, A, B
-        )
-        print(f"Naive PyTorch: {avg_time_naive:.3f} ± {std_time_naive:.3f} ms")
-        
-        # Benchmark CUDA kernel if available
-        if CUDA_AVAILABLE and device == 'cuda':
-            try:
-                avg_time_cuda, std_time_cuda, result_cuda = benchmark_operation(
-                    ternary_matmul, A, B
-                )
-                print(f"CUDA Kernel:   {avg_time_cuda:.3f} ± {std_time_cuda:.3f} ms")
+        for size in MATRIX_SIZES:
+            for sparsity in SPARSITY_LEVELS:
+                # Create test matrices
+                matrix_a = create_sparse_matrix(size, sparsity, device)
+                matrix_b = create_sparse_matrix(size, sparsity, device)
+                
+                # Benchmark float32
+                time_float32, metrics_float32 = benchmark_matmul(matrix_a, matrix_b, use_ternary=False)
+                
+                # Benchmark ternary
+                time_ternary, metrics_ternary = benchmark_matmul(matrix_a, matrix_b, use_ternary=True)
                 
                 # Calculate speedup
-                speedup = avg_time_naive / avg_time_cuda
-                print(f"Speedup:       {speedup:.2f}x")
-                print()
+                speedup = time_float32 / time_ternary if time_ternary > 0 else 0
                 
-                # Verify correctness
-                print("Correctness check:")
-                is_correct = verify_correctness(A, B, result_cuda, result_naive)
-                print(f"  Results match: {is_correct}")
+                result = {
+                    'device': device,
+                    'size': size,
+                    'sparsity': sparsity,
+                    'float32_ms': time_float32,
+                    'ternary_ms': time_ternary,
+                    'speedup': speedup,
+                    'float32_gflops': metrics_float32['gflops'],
+                    'ternary_gflops': metrics_ternary['gflops'],
+                    'float32_bandwidth': metrics_float32['bandwidth_gbs'],
+                    'ternary_bandwidth': metrics_ternary['bandwidth_gbs'],
+                }
+                results.append(result)
                 
-            except Exception as e:
-                print(f"Error running CUDA kernel: {e}")
+                print(f"Size: {size:4d} | Sparsity: {sparsity:.2f} | "
+                      f"Float32: {time_float32:7.2f}ms | Ternary: {time_ternary:7.2f}ms | "
+                      f"Speedup: {speedup:4.2f}x")
+    
+    # Convert to DataFrame
+    df = pd.DataFrame(results)
+    
+    # Save CSV
+    output_dir = Path(__file__).parent / 'results'
+    output_dir.mkdir(exist_ok=True)
+    csv_path = output_dir / 'matmul_results.csv'
+    df.to_csv(csv_path, index=False)
+    print(f"\n✓ Results saved to: {csv_path}")
+    
+    # Generate visualizations
+    create_visualizations(df, output_dir)
+    
+    # Statistical significance tests
+    perform_statistical_tests(df)
+    
+    # Save JSON
+    json_path = output_dir / 'matmul_results.json'
+    with open(json_path, 'w') as f:
+        json.dump(results, f, indent=2)
+    print(f"✓ JSON results saved to: {json_path}")
+    
+    return df
+
+
+def create_visualizations(df: pd.DataFrame, output_dir: Path):
+    """Create benchmark visualizations."""
+    
+    # 1. Speedup vs Matrix Size
+    fig, axes = plt.subplots(2, 2, figsize=(15, 12))
+    fig.suptitle('Matrix Multiplication Benchmark Results', fontsize=16, fontweight='bold')
+    
+    # Plot 1: Speedup vs Size for different sparsity levels
+    ax = axes[0, 0]
+    for sparsity in SPARSITY_LEVELS:
+        data = df[df['sparsity'] == sparsity]
+        for device in data['device'].unique():
+            device_data = data[data['device'] == device]
+            ax.plot(device_data['size'], device_data['speedup'], 
+                   marker='o', label=f'{device} - {int(sparsity*100)}% sparse')
+    ax.set_xlabel('Matrix Size')
+    ax.set_ylabel('Speedup (Ternary vs Float32)')
+    ax.set_title('Speedup vs Matrix Size')
+    ax.legend()
+    ax.grid(True, alpha=0.3)
+    ax.axhline(y=1.0, color='r', linestyle='--', alpha=0.5)
+    
+    # Plot 2: GFLOPS comparison
+    ax = axes[0, 1]
+    sizes_to_plot = [512, 1024, 2048]
+    x_pos = np.arange(len(sizes_to_plot))
+    width = 0.35
+    
+    for device in df['device'].unique():
+        device_data = df[(df['device'] == device) & (df['sparsity'] == 0.0)]
+        device_data = device_data[device_data['size'].isin(sizes_to_plot)]
         
-        print()
+        float32_gflops = device_data['float32_gflops'].values
+        ternary_gflops = device_data['ternary_gflops'].values
+        
+        ax.bar(x_pos - width/2, float32_gflops, width, label=f'{device} Float32', alpha=0.8)
+        ax.bar(x_pos + width/2, ternary_gflops, width, label=f'{device} Ternary', alpha=0.8)
     
-    # Memory efficiency test
-    print("=" * 80)
-    print("Memory Efficiency Analysis")
-    print("=" * 80)
-    print()
+    ax.set_xlabel('Matrix Size')
+    ax.set_ylabel('GFLOPS')
+    ax.set_title('GFLOPS Comparison (0% Sparsity)')
+    ax.set_xticks(x_pos)
+    ax.set_xticklabels(sizes_to_plot)
+    ax.legend()
+    ax.grid(True, alpha=0.3, axis='y')
     
-    M, K, N = 1024, 1024, 1024
-    A = generate_ternary_matrix(M, K, device=device)
-    B = generate_ternary_matrix(K, N, device=device)
+    # Plot 3: Latency vs Sparsity
+    ax = axes[1, 0]
+    size_to_plot = 1024
+    data = df[df['size'] == size_to_plot]
     
-    # Calculate theoretical memory savings
-    unpacked_size = M * K + K * N  # int8 for each element
-    packed_size = (M * K + 3) // 4 + (K * N + 3) // 4  # 4 trits per byte
-    compression_ratio = unpacked_size / packed_size
+    for device in data['device'].unique():
+        device_data = data[data['device'] == device]
+        ax.plot(device_data['sparsity'] * 100, device_data['float32_ms'], 
+               marker='o', label=f'{device} Float32')
+        ax.plot(device_data['sparsity'] * 100, device_data['ternary_ms'], 
+               marker='s', label=f'{device} Ternary')
     
-    print(f"Matrix A size: {M} x {K}")
-    print(f"Matrix B size: {K} x {N}")
-    print(f"Unpacked storage: {unpacked_size / 1024 / 1024:.2f} MB")
-    print(f"Packed storage: {packed_size / 1024 / 1024:.2f} MB")
-    print(f"Compression ratio: {compression_ratio:.2f}x")
-    print()
+    ax.set_xlabel('Sparsity (%)')
+    ax.set_ylabel('Latency (ms)')
+    ax.set_title(f'Latency vs Sparsity (Size={size_to_plot})')
+    ax.legend()
+    ax.grid(True, alpha=0.3)
     
-    # Test packing/unpacking if CUDA available
-    if CUDA_AVAILABLE and device == 'cuda':
-        try:
-            matmul_op = get_ternary_matmul()
-            
-            # Test packing
-            start = time.perf_counter()
-            A_packed = matmul_op.pack_ternary(A)
-            pack_time = (time.perf_counter() - start) * 1000
-            
-            print(f"Packing time: {pack_time:.3f} ms")
-            print(f"Packed size: {A_packed.numel()} bytes ({A_packed.numel() / 1024 / 1024:.2f} MB)")
-            
-            # Test unpacking
-            start = time.perf_counter()
-            A_unpacked = matmul_op.unpack_ternary(A_packed, M * K)
-            unpack_time = (time.perf_counter() - start) * 1000
-            
-            print(f"Unpacking time: {unpack_time:.3f} ms")
-            
-            # Verify pack/unpack correctness
-            A_flat = A.flatten()
-            matches = torch.all(A_flat == A_unpacked[:A_flat.numel()])
-            print(f"Pack/unpack correct: {matches.item()}")
-            
-        except Exception as e:
-            print(f"Error testing packing: {e}")
+    # Plot 4: Memory Bandwidth
+    ax = axes[1, 1]
+    for device in df['device'].unique():
+        device_data = df[(df['device'] == device) & (df['sparsity'] == 0.0)]
+        ax.plot(device_data['size'], device_data['float32_bandwidth'], 
+               marker='o', label=f'{device} Float32')
+        ax.plot(device_data['size'], device_data['ternary_bandwidth'], 
+               marker='s', label=f'{device} Ternary')
     
-    print()
-    print("=" * 80)
-    print("Benchmark Complete")
-    print("=" * 80)
+    ax.set_xlabel('Matrix Size')
+    ax.set_ylabel('Bandwidth (GB/s)')
+    ax.set_title('Memory Bandwidth (0% Sparsity)')
+    ax.legend()
+    ax.grid(True, alpha=0.3)
+    
+    plt.tight_layout()
+    plot_path = output_dir / 'matmul_benchmark.png'
+    plt.savefig(plot_path, dpi=300, bbox_inches='tight')
+    print(f"✓ Visualization saved to: {plot_path}")
+    plt.close()
 
 
-if __name__ == "__main__":
-    run_benchmark_suite()
+def perform_statistical_tests(df: pd.DataFrame):
+    """Perform statistical significance tests."""
+    print("\n" + "="*80)
+    print("STATISTICAL SIGNIFICANCE TESTS")
+    print("="*80)
+    
+    # Group by device and size, compare float32 vs ternary
+    for device in df['device'].unique():
+        print(f"\n{device.upper()}:")
+        device_data = df[df['device'] == device]
+        
+        for size in MATRIX_SIZES:
+            size_data = device_data[device_data['size'] == size]
+            
+            if len(size_data) > 0:
+                float32_times = size_data['float32_ms'].values
+                ternary_times = size_data['ternary_ms'].values
+                
+                # Perform paired t-test
+                t_stat, p_value = stats.ttest_rel(float32_times, ternary_times)
+                
+                mean_speedup = size_data['speedup'].mean()
+                
+                significance = "***" if p_value < 0.001 else "**" if p_value < 0.01 else "*" if p_value < 0.05 else "ns"
+                
+                print(f"  Size {size:4d}: Mean Speedup = {mean_speedup:4.2f}x, "
+                      f"p-value = {p_value:.6f} {significance}")
+
+
+def main():
+    """Main entry point for running benchmarks."""
+    print("Starting Matrix Multiplication Benchmarks...")
+    print(f"Testing on devices: {DEVICES}")
+    print(f"Matrix sizes: {MATRIX_SIZES}")
+    print(f"Sparsity levels: {[f'{s*100:.0f}%' for s in SPARSITY_LEVELS]}")
+    
+    df = generate_comparison_report()
+    
+    print("\n" + "="*80)
+    print("SUMMARY")
+    print("="*80)
+    
+    for device in df['device'].unique():
+        device_data = df[df['device'] == device]
+        avg_speedup = device_data['speedup'].mean()
+        max_speedup = device_data['speedup'].max()
+        
+        print(f"\n{device.upper()}:")
+        print(f"  Average Speedup: {avg_speedup:.2f}x")
+        print(f"  Maximum Speedup: {max_speedup:.2f}x")
+        
+        # Check if target is met
+        if avg_speedup >= 2.0:
+            print(f"  ✓ Target met: {avg_speedup:.2f}x >= 2.0x")
+        else:
+            print(f"  ✗ Target not met: {avg_speedup:.2f}x < 2.0x")
+
+
+if __name__ == '__main__':
+    main()

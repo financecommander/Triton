@@ -25,6 +25,7 @@ classifiers = [
 
 dependencies = [
     "torch>=2.1.0",
+    "torchvision>=0.16.0",
     "numpy>=1.24.0",
     "ply>=3.11",
     "jinja2>=3.0.0",
@@ -37,6 +38,13 @@ dev = [
     "black>=23.0.0",
     "ruff>=0.1.0",
     "mypy>=1.7.0",
+]
+benchmark = [
+    "pytest-benchmark>=4.0.0",
+    "matplotlib>=3.7.0",
+    "pandas>=2.0.0",
+    "scipy>=1.11.0",
+    "seaborn>=0.12.0",
 ]
 examples = [
     "torchvision>=0.16.0",
@@ -61,10 +69,10 @@ include = ["compiler*", "backend*", "kernels*", "examples*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-python_files = ["test_*.py"]
+python_files = ["test_*.py", "bench_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
-addopts = "-v --cov=compiler --cov=backend --cov=kernels --cov-report=html --cov-report=term"
+addopts = "-v"
 
 [tool.black]
 line-length = 100

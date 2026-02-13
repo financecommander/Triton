@@ -1,1 +1,3 @@
-# Benchmark tests for Triton DSL
+"""Triton Benchmark Suite."""
+
+__version__ = '0.1.0'
