@@ -41,7 +41,6 @@ from compiler.typechecker.type_checker import (
     TypeUnifier,
 )
 
-
 # ============================================================================
 # Basic Type Validation Tests
 # ============================================================================
@@ -142,9 +141,7 @@ class TestTensorTypes:
         """Test tensor with invalid trit values."""
         checker = TypeChecker()
 
-        node = TernaryTensor(
-            shape=[2, 2], values=[-1, 0, 2, 1], lineno=1, col_offset=0
-        )
+        node = TernaryTensor(shape=[2, 2], values=[-1, 0, 2, 1], lineno=1, col_offset=0)
         program = Program(statements=[ExprStatement(expr=node)])
         errors = checker.validate(program)
         assert len(errors) >= 1
@@ -256,9 +253,7 @@ class TestMatrixMultiplication:
         checker = TypeChecker()
 
         # (2, 3) @ (3, 4) -> (2, 4)
-        tensor1 = TernaryTensor(
-            shape=[2, 3], values=[1, 0, -1, 1, 0, -1], lineno=1, col_offset=0
-        )
+        tensor1 = TernaryTensor(shape=[2, 3], values=[1, 0, -1, 1, 0, -1], lineno=1, col_offset=0)
         tensor2 = TernaryTensor(
             shape=[3, 4],
             values=[1, 0, -1, 1, 0, -1, 1, 0, -1, 1, 0, -1],
@@ -282,9 +277,7 @@ class TestMatrixMultiplication:
         checker = TypeChecker()
 
         # (2, 3) @ (2, 4) -> Error: inner dimensions don't match
-        tensor1 = TernaryTensor(
-            shape=[2, 3], values=[1, 0, -1, 1, 0, -1], lineno=1, col_offset=0
-        )
+        tensor1 = TernaryTensor(shape=[2, 3], values=[1, 0, -1, 1, 0, -1], lineno=1, col_offset=0)
         tensor2 = TernaryTensor(
             shape=[2, 4], values=[1, 0, -1, 1, 0, -1, 1, 0], lineno=2, col_offset=0
         )
@@ -333,12 +326,8 @@ class TestMatrixMultiplication:
             values1 = [(-1) ** i for i in range(size1)]
             values2 = [(-1) ** i for i in range(size2)]
 
-            tensor1 = TernaryTensor(
-                shape=shape1, values=values1, lineno=1, col_offset=0
-            )
-            tensor2 = TernaryTensor(
-                shape=shape2, values=values2, lineno=2, col_offset=0
-            )
+            tensor1 = TernaryTensor(shape=shape1, values=values1, lineno=1, col_offset=0)
+            tensor2 = TernaryTensor(shape=shape2, values=values2, lineno=2, col_offset=0)
 
             assign1 = Assignment(target="m1", value=tensor1, lineno=1, col_offset=0)
             assign2 = Assignment(target="m2", value=tensor2, lineno=2, col_offset=0)
@@ -703,9 +692,7 @@ class TestErrorReporting:
 
         # Create multiple errors
         invalid_trit = TritLiteral(value=5, lineno=1, col_offset=0)
-        invalid_tensor = TernaryTensor(
-            shape=[2, 2], values=[1, 0, -1], lineno=2, col_offset=0
-        )
+        invalid_tensor = TernaryTensor(shape=[2, 2], values=[1, 0, -1], lineno=2, col_offset=0)
         undefined_var = Identifier(name="undefined", lineno=3, col_offset=0)
 
         program = Program(
@@ -862,9 +849,7 @@ class TestPerformance:
 
             func_def = FunctionDef(
                 name=func_name,
-                params=[
-                    Param(name="x", type_annotation=TritType(), lineno=i + 1, col_offset=0)
-                ],
+                params=[Param(name="x", type_annotation=TritType(), lineno=i + 1, col_offset=0)],
                 return_type=TritType(),
                 body=body,
                 lineno=i + 1,
@@ -1051,7 +1036,10 @@ class TestEffectSystem:
         # Check that function is marked as pure
         assert "pure_func" in checker.function_table
         # Pure functions should have PURE and READ effects
-        assert EffectType.PURE in checker.function_table["pure_func"].effects or EffectType.READ in checker.function_table["pure_func"].effects
+        assert (
+            EffectType.PURE in checker.function_table["pure_func"].effects
+            or EffectType.READ in checker.function_table["pure_func"].effects
+        )
 
     def test_impure_function_detection(self):
         """Test detection of impure functions."""

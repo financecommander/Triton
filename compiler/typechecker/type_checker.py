@@ -14,52 +14,42 @@ Version: 1.0.0
 
 from __future__ import annotations
 
-from typing import (
-    List,
-    Dict,
-    Optional,
-    Any,
-    Tuple,
-    Set,
-    Protocol,
-    TypeVar,
-    Generic,
-    Union,
-    cast,
-)
 from dataclasses import dataclass, field
 from enum import Enum, auto
-from collections import defaultdict
-import functools
-
-from compiler.ast.nodes import (
-    Node,
-    Visitor,
-    Program,
-    Type,
-    TritType,
-    IntType,
-    FloatType,
-    TensorType,
-    Expr,
-    TritLiteral,
-    IntLiteral,
-    FloatLiteral,
-    TernaryTensor,
-    Identifier,
-    BinaryOp,
-    UnaryOp,
-    FunctionCall,
-    Statement,
-    Assignment,
-    Return,
-    ExprStatement,
-    Param,
-    FunctionDef,
-    LayerDef,
-    Declaration,
+from typing import (
+    Any,
+    Dict,
+    List,
+    Optional,
+    Set,
 )
 
+from compiler.ast.nodes import (
+    Assignment,
+    BinaryOp,
+    Declaration,
+    Expr,
+    ExprStatement,
+    FloatLiteral,
+    FloatType,
+    FunctionCall,
+    FunctionDef,
+    Identifier,
+    IntLiteral,
+    IntType,
+    LayerDef,
+    Node,
+    Param,
+    Program,
+    Return,
+    TensorType,
+    TernaryTensor,
+    TritLiteral,
+    TritType,
+    Type,
+    UnaryOp,
+    Visitor,
+)
 
 # ============================================================================
 # Type System Enhancements
@@ -276,7 +266,7 @@ class TypeUnifier:
 
     def _types_equal(self, type1: Type, type2: Type) -> bool:
         """Check if two types are exactly equal."""
-        if type(type1) != type(type2):
+        if type(type1) is not type(type2):
             return False
         if isinstance(type1, IntType) and isinstance(type2, IntType):
             return type1.bits == type2.bits
@@ -287,7 +277,7 @@ class TypeUnifier:
                 self._types_equal(type1.element_type or Type(), type2.element_type or Type())
                 and type1.shape == type2.shape
             )
-        return type(type1) == type(type2)
+        return type(type1) is type(type2)
 
 
 # ============================================================================
@@ -404,7 +394,7 @@ class TypeChecker(Visitor):
             True if types are compatible
         """
         # Same type is always compatible
-        if type(type1) == type(type2):
+        if type(type1) is type(type2):
             if isinstance(type1, IntType) and isinstance(type2, IntType):
                 return type1.bits == type2.bits or not strict
             if isinstance(type1, FloatType) and isinstance(type2, FloatType):
@@ -426,7 +416,7 @@ class TypeChecker(Visitor):
 
         # Allow implicit conversions in non-strict mode
         if not strict:
-            # Trit and Int are compatible for some operations  
+            # Trit and Int are compatible for some operations
             if isinstance(type1, (TritType, IntType)) and isinstance(type2, (TritType, IntType)):
                 return True
 
@@ -452,10 +442,10 @@ class TypeChecker(Visitor):
                         return True
 
         return False
-    
+
     def _types_equal_simple(self, type1: Type, type2: Type) -> bool:
         """Simple type equality check without recursion."""
-        if type(type1) != type(type2):
+        if type(type1) is not type(type2):
             return False
         if isinstance(type1, IntType) and isinstance(type2, IntType):
             return type1.bits == type2.bits
@@ -496,9 +486,7 @@ class TypeChecker(Visitor):
                     context=f"Cannot unify {type(constraint.left).__name__} with {type(constraint.right).__name__}",
                 )
 
-    def _check_quantization_rules(
-        self, source_type: Type, target_type: Type, node: Node
-    ) -> bool:
+    def _check_quantization_rules(self, source_type: Type, target_type: Type, node: Node) -> bool:
         """
         Check quantization type conversion rules.
 
@@ -546,7 +534,7 @@ class TypeChecker(Visitor):
     def visit_program(self, node: Program) -> Any:
         """Visit program node."""
         self.inference_stack.append("Program")
-        
+
         # First pass: register all function signatures for forward references
         for statement in node.statements:
             if isinstance(statement, FunctionDef):
@@ -557,11 +545,11 @@ class TypeChecker(Visitor):
                     return_type=statement.return_type,
                 )
                 self.function_table[statement.name] = signature
-        
+
         # Second pass: validate all statements
         for statement in node.statements:
             statement.accept(self)
-        
+
         self.inference_stack.pop()
         return None
 
@@ -589,8 +577,8 @@ class TypeChecker(Visitor):
             self._add_error(
                 f"Trit literal must be -1, 0, or 1, got {node.value}",
                 node,
-                suggested_fix=f"Use one of the valid trit values: -1, 0, or 1",
-                context=f"Ternary values must be in the set {{-1, 0, 1}}",
+                suggested_fix="Use one of the valid trit values: -1, 0, or 1",
+                context="Ternary values must be in the set {-1, 0, 1}",
             )
 
         self.inference_stack.pop()
