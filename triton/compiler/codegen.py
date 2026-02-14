@@ -840,27 +840,27 @@ class PyTorchCodeGenerator:
         """Generate code for single instruction."""
         if inst.opcode == IROpcode.ADD:
             left, right = inst.operands[0].name, inst.operands[1].name
-            return f"{inst.result.name} = {self._clean_name(left)} + {self._clean_name(right)}"
+            return f"{self._clean_name(inst.result.name)} = {self._clean_name(left)} + {self._clean_name(right)}"
         
         elif inst.opcode == IROpcode.SUB:
             left, right = inst.operands[0].name, inst.operands[1].name
-            return f"{inst.result.name} = {self._clean_name(left)} - {self._clean_name(right)}"
+            return f"{self._clean_name(inst.result.name)} = {self._clean_name(left)} - {self._clean_name(right)}"
         
         elif inst.opcode == IROpcode.MUL:
             left, right = inst.operands[0].name, inst.operands[1].name
-            return f"{inst.result.name} = {self._clean_name(left)} * {self._clean_name(right)}"
+            return f"{self._clean_name(inst.result.name)} = {self._clean_name(left)} * {self._clean_name(right)}"
         
         elif inst.opcode == IROpcode.DIV:
             left, right = inst.operands[0].name, inst.operands[1].name
-            return f"{inst.result.name} = {self._clean_name(left)} / {self._clean_name(right)}"
+            return f"{self._clean_name(inst.result.name)} = {self._clean_name(left)} / {self._clean_name(right)}"
         
         elif inst.opcode == IROpcode.MATMUL:
             left, right = inst.operands[0].name, inst.operands[1].name
-            return f"{inst.result.name} = torch.matmul({self._clean_name(left)}, {self._clean_name(right)})"
+            return f"{self._clean_name(inst.result.name)} = torch.matmul({self._clean_name(left)}, {self._clean_name(right)})"
         
         elif inst.opcode == IROpcode.RELU:
             operand = inst.operands[0].name
-            return f"{inst.result.name} = F.relu({self._clean_name(operand)})"
+            return f"{self._clean_name(inst.result.name)} = F.relu({self._clean_name(operand)})"
         
         elif inst.opcode == IROpcode.RETURN:
             if inst.operands:
@@ -871,7 +871,7 @@ class PyTorchCodeGenerator:
         elif inst.opcode == IROpcode.CALL:
             func_name = inst.attributes.get("function", "unknown")
             args = ", ".join(self._clean_name(op.name) for op in inst.operands)
-            return f"{inst.result.name} = {func_name}({args})"
+            return f"{self._clean_name(inst.result.name)} = {func_name}({args})"
         
         elif inst.opcode == IROpcode.STORE:
             if inst.operands:
@@ -879,7 +879,7 @@ class PyTorchCodeGenerator:
         
         elif inst.opcode == IROpcode.CONST:
             value = inst.attributes.get("value")
-            return f"{inst.result.name} = {value}"
+            return f"{self._clean_name(inst.result.name)} = {value}"
         
         return None
     
