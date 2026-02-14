@@ -201,9 +201,11 @@ if __name__ == "__main__":
             "ternary",
             "tnn",
         ],
-        entry_points={
-            "console_scripts": [
-                "triton-dsl=compiler.cli:main",  # Future CLI entry point
-            ],
-        },
+        # Note: entry_points should be defined in pyproject.toml [project.scripts]
+        # to avoid conflicts. Uncomment if needed:
+        # entry_points={
+        #     "console_scripts": [
+        #         "triton-dsl=compiler.cli:main",
+        #     ],
+        # },
     )

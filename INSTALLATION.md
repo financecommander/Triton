@@ -108,10 +108,12 @@ pip install -e ".[all]"
 
 **Core dependencies for running Triton DSL compiler and runtime**
 
-- `torch>=2.1.0` - PyTorch deep learning framework
+- `torch>=2.2.0` - PyTorch deep learning framework (2.2+)
 - `numpy>=1.24.0` - Numerical computing
 - `ply>=3.11` - Lexer/parser (Python Lex-Yacc)
 - `jinja2>=3.0.0` - Code generation templates
+
+**Note:** Uses flexible version ranges for compatibility with newer releases.
 
 **Install:** `pip install -r requirements.txt`
 
@@ -149,7 +151,7 @@ Development Tools:
 
 **CUDA and GPU acceleration dependencies**
 
-- `torch==2.1.0+cu121` - PyTorch with CUDA 12.1
+- `torch>=2.2.0` - PyTorch with CUDA 12.1 support
 - `triton>=2.1.0` - OpenAI Triton for GPU kernels
 - `cuda-python>=12.0.0` - CUDA Python bindings
 
@@ -242,9 +244,10 @@ pip install -e ".[all]"
 
 | PyTorch | Status | CUDA Support |
 |---------|--------|--------------|
-| 2.1.0+ | ✅ Supported | CUDA 11.8, 12.1 |
-| 2.0.x | ⚠️ Partial | May work but untested |
-| 1.x | ❌ Not Supported | Use PyTorch 2.1+ |
+| 2.2.0+ | ✅ Supported | CUDA 11.8, 12.1, 12.4 |
+| 2.1.x | ⚠️ May work | CUDA 11.8, 12.1 |
+| 2.0.x | ⚠️ May work | CUDA 11.7, 11.8 |
+| 1.x | ❌ Not Supported | Use PyTorch 2.2+ |
 
 ### CUDA Versions (GPU Support)
 
@@ -363,10 +366,10 @@ CMD ["python3", "-m", "pytest"]
 **Solution:**
 ```bash
 # Use specific PyTorch index
-pip install torch==2.1.0 --index-url https://download.pytorch.org/whl/cu121
+pip install torch>=2.2.0 --index-url https://download.pytorch.org/whl/cu121
 
 # Or for CPU-only
-pip install torch==2.1.0 --index-url https://download.pytorch.org/whl/cpu
+pip install torch>=2.2.0 --index-url https://download.pytorch.org/whl/cpu
 ```
 
 #### 2. CUDA Not Found
@@ -383,7 +386,7 @@ python -c "import torch; print(torch.cuda.is_available())"
 
 # Reinstall PyTorch with CUDA support
 pip uninstall torch
-pip install torch==2.1.0+cu121 --extra-index-url https://download.pytorch.org/whl/cu121
+pip install torch>=2.2.0 --extra-index-url https://download.pytorch.org/whl/cu121
 ```
 
 #### 3. Import Errors
@@ -411,7 +414,7 @@ source fresh-env/bin/activate  # Linux/macOS
 # OR
 .\fresh-env\Scripts\activate  # Windows
 
-# Install with pinned versions
+# Install with version-compatible requirements
 pip install -r requirements.txt
 ```
 
@@ -424,10 +427,8 @@ pip install -r requirements.txt
 # Increase pip timeout and use no-cache
 pip install --no-cache-dir -r requirements.txt
 
-# Install one at a time
-pip install torch==2.1.0
-pip install numpy==1.24.3
-# ... continue
+# Install core packages individually if needed
+pip install torch numpy ply jinja2
 ```
 
 ### Getting Help

@@ -3,11 +3,11 @@
 # Install with: pip install -r requirements.txt
 
 # Deep Learning Framework
-torch==2.1.0
-numpy==1.24.3
+torch>=2.2.0,<3.0.0
+numpy>=1.24.0,<3.0.0
 
 # Compiler Dependencies
 ply==3.11
 
 # Code Generation
-jinja2==3.1.2
+jinja2>=3.1.0,<4.0.0
