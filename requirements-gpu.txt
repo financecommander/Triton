@@ -8,7 +8,7 @@
 # PyTorch with CUDA Support
 # For CUDA 12.1 (default) - use torch index
 --extra-index-url https://download.pytorch.org/whl/cu121
-torch>=2.2.0,<3.0.0
+torch>=2.1.0,<3.0.0
 
 # OpenAI Triton for GPU Kernels
 triton>=2.1.0,<4.0.0

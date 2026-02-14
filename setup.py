@@ -103,9 +103,9 @@ EXTRAS_REQUIRE = {
     ],
 }
 
-# Combine all extras for complete installation
+# Combine all extras for complete installation (excluding 'all' itself to avoid circular reference)
 EXTRAS_REQUIRE["all"] = [
-    dep for deps in EXTRAS_REQUIRE.values() for dep in deps
+    dep for group, deps in EXTRAS_REQUIRE.items() if group != "all" for dep in deps
 ]
 
 # Custom install command with validation

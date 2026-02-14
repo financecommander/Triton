@@ -108,7 +108,7 @@ pip install -e ".[all]"
 
 **Core dependencies for running Triton DSL compiler and runtime**
 
-- `torch>=2.2.0` - PyTorch deep learning framework (2.2+)
+- `torch>=2.1.0` - PyTorch deep learning framework (2.1+)
 - `numpy>=1.24.0` - Numerical computing
 - `ply>=3.11` - Lexer/parser (Python Lex-Yacc)
 - `jinja2>=3.0.0` - Code generation templates
@@ -151,7 +151,7 @@ Development Tools:
 
 **CUDA and GPU acceleration dependencies**
 
-- `torch>=2.2.0` - PyTorch with CUDA 12.1 support
+- `torch>=2.1.0` - PyTorch with CUDA 12.1 support
 - `triton>=2.1.0` - OpenAI Triton for GPU kernels
 - `cuda-python>=12.0.0` - CUDA Python bindings
 
@@ -244,10 +244,9 @@ pip install -e ".[all]"
 
 | PyTorch | Status | CUDA Support |
 |---------|--------|--------------|
-| 2.2.0+ | ✅ Supported | CUDA 11.8, 12.1, 12.4 |
-| 2.1.x | ⚠️ May work | CUDA 11.8, 12.1 |
+| 2.1.0+ | ✅ Supported | CUDA 11.8, 12.1, 12.4 |
 | 2.0.x | ⚠️ May work | CUDA 11.7, 11.8 |
-| 1.x | ❌ Not Supported | Use PyTorch 2.2+ |
+| 1.x | ❌ Not Supported | Use PyTorch 2.1+ |
 
 ### CUDA Versions (GPU Support)
 
@@ -366,10 +365,10 @@ CMD ["python3", "-m", "pytest"]
 **Solution:**
 ```bash
 # Use specific PyTorch index
-pip install torch>=2.2.0 --index-url https://download.pytorch.org/whl/cu121
+pip install torch>=2.1.0 --index-url https://download.pytorch.org/whl/cu121
 
 # Or for CPU-only
-pip install torch>=2.2.0 --index-url https://download.pytorch.org/whl/cpu
+pip install torch>=2.1.0 --index-url https://download.pytorch.org/whl/cpu
 ```
 
 #### 2. CUDA Not Found
@@ -386,7 +385,7 @@ python -c "import torch; print(torch.cuda.is_available())"
 
 # Reinstall PyTorch with CUDA support
 pip uninstall torch
-pip install torch>=2.2.0 --extra-index-url https://download.pytorch.org/whl/cu121
+pip install torch>=2.1.0 --extra-index-url https://download.pytorch.org/whl/cu121
 ```
 
 #### 3. Import Errors

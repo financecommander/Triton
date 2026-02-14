@@ -82,6 +82,8 @@ export = [
 ]
 
 # Complete installation (all optional dependencies)
+# NOTE: This group must be manually updated when other groups change
+# to maintain synchronization. Each dependency should be listed once.
 all = [
     "pytest>=7.4.0",
     "pytest-cov>=4.1.0",
