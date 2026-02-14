@@ -66,3 +66,13 @@ Thumbs.db
 /models/weights/
 /models/*.pth
 /models/*.onnx
+
+# Triton compilation cache
+.triton/
+
+# Compiled Triton output (generated .py files from .triton files)
+# But allow Python source code
+*.tri.py
+simple_test.py
+minimal_test.py
+test_program.py
