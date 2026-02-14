@@ -77,7 +77,7 @@ pip install -e ".[dev,examples,export]"
 ```
 torch>=2.1.0,<3.0.0          # PyTorch deep learning
 numpy>=1.24.0,<3.0.0         # Numerical computing
-ply==3.11                    # Lexer/parser
+ply>=3.11,<4.0.0             # Lexer/parser
 jinja2>=3.1.0,<4.0.0         # Code generation
 ```
 
