@@ -145,6 +145,7 @@ triton compile examples/mnist_ternary.tri --output model.py
 - [Technical Specification](docs/specs/TECHNICAL_SPEC.md)
 - [Grammar Reference](docs/specs/GRAMMAR.md)
 - [Export & Publishing Guide](docs/EXPORT_GUIDE.md)
+- [Security Workflow](docs/SECURITY_WORKFLOW.md)
 - [API Documentation](docs/api/)
 
 ## Contributing

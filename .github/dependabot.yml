@@ -1,0 +1,79 @@
+# Dependabot configuration for automated dependency updates
+# https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+
+version: 2
+updates:
+  # Python dependencies
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "02:00"
+    open-pull-requests-limit: 10
+    reviewers:
+      - "financecommander"
+    labels:
+      - "dependencies"
+      - "python"
+    commit-message:
+      prefix: "deps"
+      include: "scope"
+    # Group updates for minor and patch versions
+    groups:
+      development-dependencies:
+        patterns:
+          - "pytest*"
+          - "black"
+          - "ruff"
+          - "mypy"
+        update-types:
+          - "minor"
+          - "patch"
+      torch-ecosystem:
+        patterns:
+          - "torch*"
+          - "triton"
+        update-types:
+          - "patch"
+    # Allow security updates to create PRs immediately
+    allow:
+      - dependency-type: "all"
+    # Ignore specific versions if needed
+    ignore:
+      # Example: ignore major version updates for stable packages
+      # - dependency-name: "torch"
+      #   update-types: ["version-update:semver-major"]
+
+  # GitHub Actions dependencies
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "02:00"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "github-actions"
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+
+# Dependabot security updates are enabled by default for:
+# - Security vulnerabilities in dependencies
+# - Updates will be created automatically when vulnerabilities are detected
+# - Priority is given to critical and high severity vulnerabilities
+
+# To configure Dependabot alerts and security updates:
+# 1. Go to repository Settings
+# 2. Navigate to "Code security and analysis"
+# 3. Enable "Dependabot alerts"
+# 4. Enable "Dependabot security updates"
