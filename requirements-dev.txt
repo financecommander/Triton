@@ -1,0 +1,32 @@
+# Triton DSL - Development Dependencies
+# Install with: pip install -r requirements.txt -r requirements-dev.txt
+
+# Base requirements
+-r requirements.txt
+
+# Testing Framework
+pytest==7.4.3
+pytest-cov==4.1.0
+pytest-benchmark==4.0.0
+hypothesis==6.92.0
+
+# Code Quality
+black==23.12.1
+flake8==7.0.0
+mypy==1.7.1
+pylint==3.0.3
+ruff==0.1.8
+
+# Documentation
+sphinx==7.2.6
+sphinx-rtd-theme==2.0.0
+sphinx-autodoc-typehints==1.25.2
+myst-parser==2.0.0
+
+# Development Tools
+ipython==8.18.1
+jupyterlab==4.0.9
+jupyter==1.0.0
+
+# Type Stubs
+types-setuptools==69.0.0.0

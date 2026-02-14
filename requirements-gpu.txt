@@ -1,0 +1,20 @@
+# Triton DSL - GPU Support Dependencies
+# Install with: pip install -r requirements.txt -r requirements-gpu.txt
+# Note: Requires CUDA 12.0+ installed on the system
+
+# Base requirements
+-r requirements.txt
+
+# PyTorch with CUDA Support
+# For CUDA 12.1 (default)
+--extra-index-url https://download.pytorch.org/whl/cu121
+torch==2.1.0+cu121
+
+# OpenAI Triton for GPU Kernels
+triton==2.1.0
+
+# CUDA Python Bindings
+cuda-python==12.3.0
+
+# cuDNN (optional, for additional optimizations)
+# nvidia-cudnn-cu12==8.9.7.29
