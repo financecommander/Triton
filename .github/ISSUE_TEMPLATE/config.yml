@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation
+    url: https://github.com/financecommander/Triton/docs
+    about: Check the documentation for usage guides and API reference
+  - name: Discussions
+    url: https://github.com/financecommander/Triton/discussions
+    about: Ask questions and discuss ideas with the community
