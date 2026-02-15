@@ -330,7 +330,7 @@ class KnowledgeDistillation:
         }
 
 # Usage
-teacher = torchvision.models.resnet18(pretrained=True)
+teacher = torchvision.models.resnet18(weights=torchvision.models.ResNet18_Weights.DEFAULT)
 student = MixedPrecisionTernaryModel()
 
 distiller = KnowledgeDistillation(

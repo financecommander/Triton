@@ -477,13 +477,13 @@ Always pre-train with FP32 before quantization:
 
 ```python
 # ✓ Good
-train_fp32(model, 10_epochs)
+train_fp32(model, epochs=10)
 enable_quantization(model)
-fine_tune(model, 20_epochs)
+fine_tune(model, epochs=20)
 
 # ✗ Bad
 enable_quantization(model)
-train_from_scratch(model, 30_epochs)
+train_from_scratch(model, epochs=30)
 ```
 
 ### 2. Use Batch Normalization
