@@ -14,6 +14,7 @@ import time
 from pathlib import Path
 import json
 import sys
+import numpy as np
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
@@ -218,5 +219,4 @@ def main():
 
 
 if __name__ == '__main__':
-    import numpy as np
     main()
