@@ -2,6 +2,16 @@
 
 This directory contains example implementations demonstrating Ternary Neural Networks using the Triton DSL approach.
 
+## 📚 Interactive Notebooks
+
+**New!** Comprehensive Jupyter notebooks for learning Triton DSL interactively:
+
+- **[01_introduction.ipynb](notebooks/01_introduction.ipynb)** - Get started with Triton DSL and ternary neural networks
+- **[02_quantization_tutorial.ipynb](notebooks/02_quantization_tutorial.ipynb)** - Deep dive into quantization techniques
+- **[03_performance_analysis.ipynb](notebooks/03_performance_analysis.ipynb)** - Performance profiling and optimization
+
+👉 **[See Notebooks README](notebooks/README.md)** for detailed guide and setup instructions.
+
 ## Examples
 
 ### 1. MNIST Ternary Neural Network (`mnist_ternary.py`)

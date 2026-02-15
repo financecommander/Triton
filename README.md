@@ -142,6 +142,13 @@ triton compile examples/mnist_ternary.tri --output model.py
 
 ## Documentation
 
+### Interactive Notebooks
+- [01 - Introduction to Triton DSL](examples/notebooks/01_introduction.ipynb)
+- [02 - Quantization Tutorial](examples/notebooks/02_quantization_tutorial.ipynb)
+- [03 - Performance Analysis](examples/notebooks/03_performance_analysis.ipynb)
+- [Notebooks Guide](examples/notebooks/README.md)
+
+### Guides & References
 - [Technical Specification](docs/specs/TECHNICAL_SPEC.md)
 - [Grammar Reference](docs/specs/GRAMMAR.md)
 - [Export & Publishing Guide](docs/EXPORT_GUIDE.md)

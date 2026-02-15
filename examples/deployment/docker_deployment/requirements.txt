@@ -1,0 +1,30 @@
+# Triton DSL Inference Server Dependencies
+
+# Core dependencies
+torch>=2.1.0
+torchvision>=0.16.0
+numpy>=1.24.0
+
+# Web framework
+flask>=3.0.0
+flask-cors>=4.0.0
+gunicorn>=21.2.0
+
+# Request handling
+werkzeug>=3.0.0
+
+# Image processing
+Pillow>=10.0.0
+
+# API utilities
+pydantic>=2.0.0
+
+# Monitoring and logging
+prometheus-client>=0.19.0
+
+# Optional: for ONNX support
+# onnx>=1.15.0
+# onnxruntime>=1.16.0
+
+# Optional: for extended formats
+# opencv-python>=4.8.0
