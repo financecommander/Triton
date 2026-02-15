@@ -18,6 +18,7 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 PYPROJECT_TOML = PROJECT_ROOT / "pyproject.toml"
+MAX_OUTPUT_CHARS = 2000
 
 
 def get_version() -> str:
@@ -101,7 +102,7 @@ def run_tests() -> bool:
     )
     if result.returncode != 0:
         print("ERROR: Tests failed")
-        print(result.stdout[-2000:] if len(result.stdout) > 2000 else result.stdout)
+        print(result.stdout[-MAX_OUTPUT_CHARS:] if len(result.stdout) > MAX_OUTPUT_CHARS else result.stdout)
         return False
     print("All tests passed")
     return True
