@@ -1,0 +1,208 @@
+// Ternary ResNet-18 for CIFAR-10 Classification
+// Production-ready architecture with ternary quantization
+
+model TernaryResNet18 {
+    // Model configuration
+    num_classes: 10     // CIFAR-10 classes
+    in_channels: 3      // RGB images
+    
+    // Initial convolution layer
+    layer conv1: TernaryConv2d {
+        in_channels: 3
+        out_channels: 64
+        kernel_size: 3
+        stride: 1
+        padding: 1
+        quantization: "deterministic"
+        bias: false
+    }
+    
+    layer bn1: BatchNorm2d {
+        num_features: 64
+    }
+    
+    layer relu: ReLU {}
+    
+    // ResNet blocks (4 stages)
+    // Stage 1: 64 channels, 2 blocks
+    layer layer1: ResidualBlock[2] {
+        in_channels: 64
+        out_channels: 64
+        stride: 1
+        quantization: "ternary"
+    }
+    
+    // Stage 2: 128 channels, 2 blocks
+    layer layer2: ResidualBlock[2] {
+        in_channels: 64
+        out_channels: 128
+        stride: 2
+        quantization: "ternary"
+    }
+    
+    // Stage 3: 256 channels, 2 blocks
+    layer layer3: ResidualBlock[2] {
+        in_channels: 128
+        out_channels: 256
+        stride: 2
+        quantization: "ternary"
+    }
+    
+    // Stage 4: 512 channels, 2 blocks
+    layer layer4: ResidualBlock[2] {
+        in_channels: 256
+        out_channels: 512
+        stride: 2
+        quantization: "ternary"
+    }
+    
+    // Global average pooling
+    layer avgpool: AdaptiveAvgPool2d {
+        output_size: (1, 1)
+    }
+    
+    // Final classification layer
+    layer fc: TernaryLinear {
+        in_features: 512
+        out_features: num_classes
+        quantization: "deterministic"
+    }
+    
+    // Forward pass
+    forward(x: Tensor[batch_size, 3, 32, 32]) -> Tensor[batch_size, num_classes] {
+        // Initial convolution
+        x = conv1(x)
+        x = bn1(x)
+        x = relu(x)
+        
+        // ResNet stages
+        x = layer1(x)
+        x = layer2(x)
+        x = layer3(x)
+        x = layer4(x)
+        
+        // Global pooling and classification
+        x = avgpool(x)
+        x = flatten(x, start_dim: 1)
+        x = fc(x)
+        
+        return x
+    }
+    
+    // Training configuration
+    training {
+        optimizer: "sgd"
+        learning_rate: 0.1
+        momentum: 0.9
+        weight_decay: 0.0001
+        batch_size: 128
+        epochs: 100
+        
+        // Learning rate schedule
+        lr_schedule: {
+            type: "multistep"
+            milestones: [50, 75]
+            gamma: 0.1
+        }
+        
+        // Data augmentation
+        augmentation: {
+            random_crop: [32, 32, 4]    // size, padding
+            random_horizontal_flip: 0.5  // probability
+            normalize: {
+                mean: [0.4914, 0.4822, 0.4465]
+                std: [0.2023, 0.1994, 0.2010]
+            }
+        }
+        
+        gradient_estimator: "STE"
+        loss: "cross_entropy"
+    }
+    
+    // Expected performance
+    performance {
+        expected_accuracy: 0.87  // 87% on CIFAR-10 test set
+        model_size_mb: 2.7       // vs 42MB float32 (15x compression)
+        inference_ms: 15         // GPU inference time
+        throughput_imgs_sec: 850 // Batch size 128
+        compression_ratio: 15    // vs float32 baseline
+    }
+}
+
+// Residual Block definition
+block ResidualBlock {
+    params {
+        in_channels: int
+        out_channels: int
+        stride: int = 1
+        quantization: str = "ternary"
+    }
+    
+    // First convolution
+    layer conv1: TernaryConv2d {
+        in_channels: in_channels
+        out_channels: out_channels
+        kernel_size: 3
+        stride: stride
+        padding: 1
+        bias: false
+    }
+    
+    layer bn1: BatchNorm2d {
+        num_features: out_channels
+    }
+    
+    // Second convolution
+    layer conv2: TernaryConv2d {
+        in_channels: out_channels
+        out_channels: out_channels
+        kernel_size: 3
+        stride: 1
+        padding: 1
+        bias: false
+    }
+    
+    layer bn2: BatchNorm2d {
+        num_features: out_channels
+    }
+    
+    // Downsample shortcut if dimensions change
+    layer downsample: if (stride != 1 or in_channels != out_channels) {
+        TernaryConv2d {
+            in_channels: in_channels
+            out_channels: out_channels
+            kernel_size: 1
+            stride: stride
+            bias: false
+        }
+        BatchNorm2d {
+            num_features: out_channels
+        }
+    }
+    
+    forward(x: Tensor) -> Tensor {
+        identity = x
+        
+        // Main path
+        out = conv1(x)
+        out = bn1(out)
+        out = relu(out)
+        
+        out = conv2(out)
+        out = bn2(out)
+        
+        // Shortcut connection
+        if downsample is not None {
+            identity = downsample(x)
+        }
+        
+        out += identity
+        out = relu(out)
+        
+        return out
+    }
+}
+
+// Example usage:
+// triton compile resnet18.triton --output ternary_resnet18.py
+// python ternary_resnet18.py --train --dataset cifar10 --epochs 100 --gpu

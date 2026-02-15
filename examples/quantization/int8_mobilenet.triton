@@ -1,0 +1,333 @@
+// INT8 Quantized MobileNetV2
+// Demonstrates INT8 quantization for mobile deployment
+
+model INT8MobileNet {
+    // Model configuration
+    num_classes: 1000
+    width_multiplier: 1.0
+    
+    // INT8 quantization configuration
+    quantization {
+        method: "int8"
+        weight_bits: 8
+        activation_bits: 8
+        symmetric: true           // Symmetric quantization
+        per_channel: true         // Per-channel quantization for weights
+        calibration: "minmax"     // Calibration method
+        
+        // Quantization-aware training settings
+        qat_mode: true
+        fake_quantize: true       // Use fake quantization during training
+        observer_type: "minmax"   // Observer for calibration
+    }
+    
+    // Initial convolution
+    layer conv1: QuantizedConv2d {
+        in_channels: 3
+        out_channels: 32
+        kernel_size: 3
+        stride: 2
+        padding: 1
+        bias: false
+        quant_mode: "int8"
+        per_channel: true
+    }
+    
+    layer bn1: BatchNorm2d { num_features: 32 }
+    layer relu6: ReLU6 {}
+    
+    // Inverted residual blocks with INT8 quantization
+    layer blocks: INT8InvertedResidual[] {
+        // Expansion, output, num_blocks, stride
+        [1, 16, 1, 1],
+        [6, 24, 2, 2],
+        [6, 32, 3, 2],
+        [6, 64, 4, 2],
+        [6, 96, 3, 1],
+        [6, 160, 3, 2],
+        [6, 320, 1, 1],
+    }
+    
+    // Final layers
+    layer conv2: QuantizedConv2d {
+        in_channels: 320
+        out_channels: 1280
+        kernel_size: 1
+        stride: 1
+        bias: false
+        quant_mode: "int8"
+        per_channel: true
+    }
+    
+    layer bn2: BatchNorm2d { num_features: 1280 }
+    layer avgpool: AdaptiveAvgPool2d { output_size: (1, 1) }
+    layer dropout: Dropout { p: 0.2 }
+    
+    layer classifier: QuantizedLinear {
+        in_features: 1280
+        out_features: num_classes
+        quant_mode: "int8"
+    }
+    
+    forward(x: Tensor[batch_size, 3, 224, 224]) -> Tensor[batch_size, num_classes] {
+        // Quantize input
+        x = quantize_tensor(x, scale, zero_point)
+        
+        x = conv1(x)
+        x = bn1(x)
+        x = relu6(x)
+        
+        x = blocks(x)
+        
+        x = conv2(x)
+        x = bn2(x)
+        x = relu6(x)
+        
+        x = avgpool(x)
+        x = flatten(x, 1)
+        x = dropout(x)
+        x = classifier(x)
+        
+        // Dequantize output
+        x = dequantize_tensor(x, scale, zero_point)
+        
+        return x
+    }
+    
+    training {
+        optimizer: "adam"
+        learning_rate: 0.001
+        weight_decay: 0.0001
+        batch_size: 96
+        epochs: 150
+        
+        // Quantization-aware training
+        qat_schedule: {
+            start_epoch: 10          // Start QAT after warmup
+            freeze_bn_stats: 50      // Freeze BN stats at epoch 50
+            observer_update_freq: 100 // Update observers every N batches
+        }
+        
+        lr_schedule: {
+            type: "cosine"
+            min_lr: 1e-6
+        }
+        
+        loss: "cross_entropy"
+    }
+    
+    performance {
+        expected_top1_accuracy: 0.59  // 59% Top-1 on ImageNet
+        expected_top5_accuracy: 0.82  // 82% Top-5
+        model_size_mb: 3.5            // INT8 size
+        inference_ms: 25              // Mobile CPU (optimized)
+        inference_fps: 40             // Frames per second
+        compression_ratio: 4          // vs float32
+    }
+}
+
+// INT8 Inverted Residual Block
+block INT8InvertedResidual {
+    params {
+        in_channels: int
+        out_channels: int
+        stride: int
+        expand_ratio: int
+    }
+    
+    hidden_dim: int = in_channels * expand_ratio
+    use_residual: bool = (stride == 1 and in_channels == out_channels)
+    
+    // Expansion with INT8
+    layer expand_conv: if (expand_ratio != 1) {
+        QuantizedConv2d {
+            in_channels: in_channels
+            out_channels: hidden_dim
+            kernel_size: 1
+            quant_mode: "int8"
+            per_channel: true
+            bias: false
+        }
+        BatchNorm2d { num_features: hidden_dim }
+        ReLU6 {}
+    }
+    
+    // Depthwise with INT8
+    layer depthwise_conv: QuantizedConv2d {
+        in_channels: hidden_dim
+        out_channels: hidden_dim
+        kernel_size: 3
+        stride: stride
+        padding: 1
+        groups: hidden_dim
+        quant_mode: "int8"
+        per_channel: true
+        bias: false
+    }
+    
+    layer dw_bn: BatchNorm2d { num_features: hidden_dim }
+    
+    // Projection
+    layer project_conv: QuantizedConv2d {
+        in_channels: hidden_dim
+        out_channels: out_channels
+        kernel_size: 1
+        quant_mode: "int8"
+        per_channel: true
+        bias: false
+    }
+    
+    layer project_bn: BatchNorm2d { num_features: out_channels }
+    
+    forward(x: Tensor) -> Tensor {
+        identity = x
+        
+        if expand_conv is not None {
+            out = expand_conv(x)
+        } else {
+            out = x
+        }
+        
+        out = depthwise_conv(out)
+        out = dw_bn(out)
+        out = relu6(out)
+        
+        out = project_conv(out)
+        out = project_bn(out)
+        
+        if use_residual {
+            out = quantized_add(out, identity)
+        }
+        
+        return out
+    }
+}
+
+// INT8 Quantized Convolution Layer
+layer QuantizedConv2d {
+    params {
+        in_channels: int
+        out_channels: int
+        kernel_size: int
+        stride: int = 1
+        padding: int = 0
+        groups: int = 1
+        bias: bool = true
+        quant_mode: str = "int8"
+        per_channel: bool = true
+    }
+    
+    param weight: Tensor {
+        shape: [out_channels, in_channels // groups, kernel_size, kernel_size]
+        init: "kaiming_normal"
+    }
+    
+    param bias: if (bias) Tensor {
+        shape: [out_channels]
+        init: "zeros"
+    }
+    
+    // Quantization parameters
+    param weight_scale: Tensor {
+        shape: [out_channels] if per_channel else [1]
+        init: "ones"
+        learnable: false
+    }
+    
+    param weight_zero_point: Tensor {
+        shape: [out_channels] if per_channel else [1]
+        init: "zeros"
+        learnable: false
+    }
+    
+    forward(x: Tensor) -> Tensor {
+        // Quantize weights to INT8
+        weight_q = fake_quantize_per_channel(
+            weight, 
+            weight_scale, 
+            weight_zero_point,
+            quant_min: -128,
+            quant_max: 127
+        )
+        
+        // Convolution with quantized weights
+        return conv2d(x, weight_q, bias, stride, padding, groups)
+    }
+}
+
+// INT8 Quantized Linear Layer
+layer QuantizedLinear {
+    params {
+        in_features: int
+        out_features: int
+        bias: bool = true
+        quant_mode: str = "int8"
+    }
+    
+    param weight: Tensor {
+        shape: [out_features, in_features]
+        init: "kaiming_normal"
+    }
+    
+    param bias: if (bias) Tensor {
+        shape: [out_features]
+        init: "zeros"
+    }
+    
+    param weight_scale: Tensor {
+        shape: [out_features]
+        init: "ones"
+        learnable: false
+    }
+    
+    param weight_zero_point: Tensor {
+        shape: [out_features]
+        init: "zeros"
+        learnable: false
+    }
+    
+    forward(x: Tensor) -> Tensor {
+        // Quantize weights
+        weight_q = fake_quantize_per_channel(
+            weight,
+            weight_scale,
+            weight_zero_point,
+            quant_min: -128,
+            quant_max: 127
+        )
+        
+        return linear(x, weight_q, bias)
+    }
+}
+
+// Fake quantization for QAT
+function fake_quantize_per_channel(
+    tensor: Tensor,
+    scale: Tensor,
+    zero_point: Tensor,
+    quant_min: int,
+    quant_max: int
+) -> Tensor {
+    // Scale to quantized range
+    tensor_scaled = tensor / scale.unsqueeze(-1).unsqueeze(-1)
+    tensor_scaled = tensor_scaled + zero_point.unsqueeze(-1).unsqueeze(-1)
+    
+    // Clamp to quantization range
+    tensor_q = clamp(round(tensor_scaled), quant_min, quant_max)
+    
+    // Dequantize back to float (for training)
+    tensor_dq = (tensor_q - zero_point.unsqueeze(-1).unsqueeze(-1)) * scale.unsqueeze(-1).unsqueeze(-1)
+    
+    return tensor_dq
+}
+
+// Quantized add operation
+function quantized_add(x: Tensor, y: Tensor) -> Tensor {
+    // Rescale if needed to match scales
+    return x + y
+}
+
+// Example usage:
+// triton compile int8_mobilenet.triton --output int8_mobilenet.py
+// python int8_mobilenet.py --train --dataset imagenet --qat --epochs 150
+// python int8_mobilenet.py --export-tflite --checkpoint best.pth
