@@ -374,3 +374,7 @@ class TestIntegration:
         assert GPUOptimizer is not None
         assert callable(gpu_ternary_matmul)
         assert callable(batch_ternary_matmul)
+        assert callable(pack_ternary_vectorized)
+        assert callable(unpack_ternary_vectorized)
+        assert callable(optimize_memory_layout)
+        assert callable(ensure_contiguous_layout)

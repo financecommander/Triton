@@ -14,6 +14,7 @@ and the high-level model layers in backend/pytorch/.
 import torch
 import torch.nn.functional as F
 from typing import Optional, Tuple, List
+import math
 
 # Check for GPU kernel availability
 try:
@@ -365,9 +366,7 @@ class GPUOptimizer:
         Returns:
             Unpacked tensor with values in {-1, 0, 1}
         """
-        n_elements = 1
-        for dim in original_shape:
-            n_elements *= dim
+        n_elements = math.prod(original_shape)
 
         if self._triton_available and packed.is_cuda:
             return unpack_ternary_triton(packed, original_shape)
