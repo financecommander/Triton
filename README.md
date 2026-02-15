@@ -1,5 +1,11 @@
 # Triton DSL
 
+[![CI](https://github.com/financecommander/Triton/workflows/CI/badge.svg)](https://github.com/financecommander/Triton/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/triton-dsl)](https://pypi.org/project/triton-dsl/)
+[![Python](https://img.shields.io/pypi/pyversions/triton-dsl)](https://pypi.org/project/triton-dsl/)
+[![Documentation](https://img.shields.io/badge/docs-latest-blue)](https://financecommander.github.io/Triton)
+[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+
 **Domain-Specific Language for Ternary Neural Networks (TNNs)**
 
 ## Overview
