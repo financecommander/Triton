@@ -14,7 +14,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../..'))
 
 from compiler.ast.nodes import LayerDef, Param
 from backend.pytorch.codegen import generate_pytorch_code
-from backend.pytorch.ops.quantize import quantize_to_ternary
+from tests.integration.test_adapters import quantize_to_ternary
 
 
 class TestErrorHandling:

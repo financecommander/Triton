@@ -12,7 +12,7 @@ import os
 # Add project root to path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../..'))
 
-from backend.pytorch.ops.quantize import (
+from tests.integration.test_adapters import (
     quantize_to_ternary, 
     quantize_model_to_ternary,
     calibrate_threshold,

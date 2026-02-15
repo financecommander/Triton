@@ -14,9 +14,11 @@ from pathlib import Path
 # Add project root to path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../..'))
 
-from backend.pytorch.export.onnx_exporter import export_to_onnx, ONNXExporter
-from backend.pytorch.export.huggingface_hub import publish_to_huggingface
-from backend.pytorch.export.github_publisher import publish_to_github
+from tests.integration.test_adapters import (
+    ONNXExporter,
+    publish_to_huggingface,
+    publish_to_github
+)
 
 
 class TestExportPipeline:
@@ -411,7 +413,7 @@ class TestExportPipeline:
     
     def test_export_quantized_model(self, reference_pytorch_model, temp_dir):
         """Test exporting quantized model."""
-        from backend.pytorch.ops.quantize import quantize_model_to_ternary
+        from tests.integration.test_adapters import quantize_model_to_ternary
         
         model = reference_pytorch_model
         

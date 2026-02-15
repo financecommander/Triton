@@ -13,7 +13,7 @@ import os
 # Add project root to path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../..'))
 
-from backend.pytorch.ops.quantize import quantize_model_to_ternary
+from tests.integration.test_adapters import quantize_model_to_ternary
 from tests.integration.test_utils import (
     validate_gradients,
     test_forward_backward_pass,
