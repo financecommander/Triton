@@ -123,7 +123,7 @@ def pack_ternary_triton(tensor: torch.Tensor) -> torch.Tensor:
 
 def pack_ternary_cpu(tensor: torch.Tensor) -> torch.Tensor:
     """
-    CPU implementation of ternary packing.
+    CPU implementation of ternary packing using vectorized operations.
 
     Args:
         tensor: Flat tensor with values in {-1, 0, 1}
@@ -132,18 +132,23 @@ def pack_ternary_cpu(tensor: torch.Tensor) -> torch.Tensor:
         Packed tensor with dtype uint8
     """
     n_elements = tensor.numel()
-    packed_size = (n_elements + 3) // 4
-    packed = torch.zeros(packed_size, dtype=torch.uint8, device=tensor.device)
+    pad_size = (4 - n_elements % 4) % 4
+    if pad_size > 0:
+        tensor = torch.cat([tensor, torch.zeros(pad_size, dtype=torch.int8, device=tensor.device)])
 
-    for i in range(n_elements):
-        trit = tensor[i].item()
-        # Convert trit to 2-bit: -1 -> 0, 0 -> 1, 1 -> 2
-        bit_val = trit + 1
-        byte_idx = i // 4
-        trit_pos = i % 4
-        packed[byte_idx] |= (bit_val << (trit_pos * 2))
+    # Map: -1 -> 0, 0 -> 1, 1 -> 2 (vectorized)
+    encoded = (tensor + 1).to(torch.uint8)
 
-    return packed
+    # Pack 4 trits per byte
+    encoded = encoded.view(-1, 4)
+    packed = (
+        encoded[:, 0]
+        | (encoded[:, 1] << 2)
+        | (encoded[:, 2] << 4)
+        | (encoded[:, 3] << 6)
+    )
+
+    return packed.to(torch.uint8)
 
 
 def unpack_ternary_triton(packed: torch.Tensor, original_shape: torch.Size) -> torch.Tensor:
@@ -180,7 +185,7 @@ def unpack_ternary_triton(packed: torch.Tensor, original_shape: torch.Size) -> t
 
 def unpack_ternary_cpu(packed: torch.Tensor, n_elements: int) -> torch.Tensor:
     """
-    CPU implementation of ternary unpacking.
+    CPU implementation of ternary unpacking using vectorized operations.
 
     Args:
         packed: Packed tensor with dtype uint8
@@ -189,16 +194,17 @@ def unpack_ternary_cpu(packed: torch.Tensor, n_elements: int) -> torch.Tensor:
     Returns:
         Unpacked tensor with values in {-1, 0, 1}
     """
-    unpacked = torch.empty(n_elements, dtype=torch.int8, device=packed.device)
+    packed_uint = packed.to(torch.uint8)
 
-    for i in range(n_elements):
-        byte_idx = i // 4
-        trit_pos = i % 4
-        byte_val = packed[byte_idx].item()
-        bit_val = (byte_val >> (trit_pos * 2)) & 0x03
-        # Convert back to trit: 0 -> -1, 1 -> 0, 2 -> 1
-        trit = bit_val - 1
-        unpacked[i] = trit
+    # Extract each 2-bit value (vectorized)
+    t0 = (packed_uint & 0x03).to(torch.int8)
+    t1 = ((packed_uint >> 2) & 0x03).to(torch.int8)
+    t2 = ((packed_uint >> 4) & 0x03).to(torch.int8)
+    t3 = ((packed_uint >> 6) & 0x03).to(torch.int8)
+
+    # Interleave and decode: 0 -> -1, 1 -> 0, 2 -> 1
+    unpacked = torch.stack([t0, t1, t2, t3], dim=1).flatten()
+    unpacked = unpacked[:n_elements] - 1
 
     return unpacked
 

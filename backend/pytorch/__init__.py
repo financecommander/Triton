@@ -15,6 +15,13 @@ from .ternary_models import (
     TernaryCIFAR10Net,
 )
 
+# Import GPU optimizer with graceful fallback
+try:
+    from backend.triton_gpu import GPUOptimizer
+    _GPU_OPTIMIZER_AVAILABLE = True
+except ImportError:
+    _GPU_OPTIMIZER_AVAILABLE = False
+
 __all__ = [
     'TernaryTensor',
     'ternary_matmul',
@@ -26,3 +33,6 @@ __all__ = [
     'TernaryMNISTNet',
     'TernaryCIFAR10Net',
 ]
+
+if _GPU_OPTIMIZER_AVAILABLE:
+    __all__.append('GPUOptimizer')
