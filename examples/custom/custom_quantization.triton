@@ -1,0 +1,370 @@
+// Custom Quantization Schemes
+// Advanced quantization techniques beyond standard methods
+
+// Logarithmic Quantization
+layer LogQuantization {
+    params {
+        bits: int = 4
+        learnable_scale: bool = true
+    }
+    
+    param scale: if (learnable_scale) Tensor {
+        shape: [1]
+        init: "ones"
+        requires_grad: true
+    }
+    
+    forward(x: Tensor) -> Tensor {
+        s = scale if learnable_scale else 1.0
+        
+        // Logarithmic quantization
+        x_sign = sign(x)
+        x_abs = abs(x / s)
+        
+        // Logarithmic mapping
+        x_log = log2(x_abs + 1)
+        
+        // Quantize
+        max_val = 2 ** bits - 1
+        x_quant = round(x_log * max_val / log2(max_abs(x_abs) + 1))
+        x_quant = clamp(x_quant, 0, max_val)
+        
+        // Dequantize
+        x_dequant = (2 ** (x_quant * log2(max_abs(x_abs) + 1) / max_val) - 1) * s
+        x_dequant = x_dequant * x_sign
+        
+        // STE
+        if self.training {
+            x_dequant = x_dequant + (x - stop_gradient(x))
+        }
+        
+        return x_dequant
+    }
+}
+
+// Learned Step Size Quantization (LSQ)
+layer LSQQuantization {
+    params {
+        bits: int = 8
+        symmetric: bool = true
+        per_channel: bool = false
+        num_channels: int = 1
+    }
+    
+    // Learnable step size
+    param step_size: Tensor {
+        shape: [num_channels] if per_channel else [1]
+        init: "ones"
+        requires_grad: true
+    }
+    
+    // Gradient scale for step size
+    param grad_scale: float = 1.0 / sqrt(num_channels * (2 ** bits))
+    
+    forward(x: Tensor) -> Tensor {
+        // Compute quantization bounds
+        if symmetric {
+            quant_min = -(2 ** (bits - 1))
+            quant_max = 2 ** (bits - 1) - 1
+        } else {
+            quant_min = 0
+            quant_max = 2 ** bits - 1
+        }
+        
+        // Quantize
+        s = abs(step_size)
+        x_quant = round(x / s)
+        x_quant = clamp(x_quant, quant_min, quant_max)
+        
+        // Dequantize
+        x_dequant = x_quant * s
+        
+        // LSQ gradient: scale gradient of step_size
+        if self.training {
+            # Special gradient for step_size
+            x_dequant = lsq_backward(x, x_dequant, step_size, grad_scale)
+        }
+        
+        return x_dequant
+    }
+    
+    function lsq_backward(
+        x: Tensor,
+        x_quant: Tensor,
+        step_size: Tensor,
+        grad_scale: float
+    ) -> Tensor {
+        // Custom backward pass for LSQ
+        # PyTorch implementation would use autograd.Function
+        # Here we simulate the concept
+        
+        indicator = (x_quant == clamp(round(x / step_size), quant_min, quant_max)).float()
+        
+        // Gradient w.r.t. x: standard STE
+        grad_x = indicator
+        
+        // Gradient w.r.t. step_size: scaled
+        grad_s = -x / step_size * indicator + (1 - indicator) * sign(x - x_quant)
+        grad_s = grad_s * grad_scale
+        
+        return x_quant + (x - stop_gradient(x))
+    }
+}
+
+// Differentiable Soft Quantization
+layer SoftQuantization {
+    params {
+        bits: int = 4
+        temperature: float = 1.0
+        anneal_temperature: bool = true
+    }
+    
+    state current_temperature: float = temperature
+    
+    forward(x: Tensor) -> Tensor {
+        levels = 2 ** bits
+        
+        // Normalize input to [0, 1]
+        x_min = min(x)
+        x_max = max(x)
+        x_norm = (x - x_min) / (x_max - x_min + 1e-7)
+        
+        // Soft quantization using sigmoid
+        x_scaled = x_norm * (levels - 1)
+        
+        if self.training {
+            // Soft quantization (differentiable)
+            # Simulate discrete levels with soft assignments
+            soft_quant = 0.0
+            for i in range(levels) {
+                # Soft assignment to level i
+                dist = abs(x_scaled - i)
+                weight = sigmoid(-dist / current_temperature)
+                soft_quant = soft_quant + i * weight
+            }
+            x_quant = soft_quant
+            
+            // Anneal temperature
+            if anneal_temperature {
+                current_temperature = max(0.1, current_temperature * 0.999)
+            }
+        } else {
+            // Hard quantization (inference)
+            x_quant = round(x_scaled)
+        }
+        
+        // Denormalize
+        x_dequant = x_quant / (levels - 1) * (x_max - x_min) + x_min
+        
+        return x_dequant
+    }
+}
+
+// Mixed-Precision Block-wise Quantization
+layer BlockwiseMixedQuantization {
+    params {
+        in_features: int
+        out_features: int
+        block_size: int = 32
+        bit_options: list[int] = [2, 4, 8]
+    }
+    
+    num_blocks: int = (out_features * in_features) / (block_size * block_size)
+    
+    // Weight matrix
+    param weight: Tensor {
+        shape: [out_features, in_features]
+        init: "kaiming_normal"
+    }
+    
+    // Precision selector per block (learned)
+    param precision_logits: Tensor {
+        shape: [num_blocks, len(bit_options)]
+        init: "zeros"
+        requires_grad: true
+    }
+    
+    forward(x: Tensor) -> Tensor {
+        if self.training {
+            // Soft precision selection (Gumbel-Softmax)
+            precision_probs = gumbel_softmax(precision_logits, temperature: 1.0)
+        } else {
+            // Hard precision selection
+            precision_idx = argmax(precision_logits, dim: 1)
+            precision_probs = one_hot(precision_idx, len(bit_options))
+        }
+        
+        // Quantize each block with selected precision
+        weight_quant = zeros_like(weight)
+        
+        block_idx = 0
+        for i in range(0, out_features, block_size) {
+            for j in range(0, in_features, block_size) {
+                weight_block = weight[i:i+block_size, j:j+block_size]
+                
+                // Quantize with different precisions
+                quant_blocks = []
+                for bits in bit_options {
+                    quant_block = quantize_block(weight_block, bits)
+                    quant_blocks.append(quant_block)
+                }
+                
+                // Weighted combination based on precision probabilities
+                weight_block_quant = sum([
+                    quant_blocks[k] * precision_probs[block_idx, k]
+                    for k in range(len(bit_options))
+                ])
+                
+                weight_quant[i:i+block_size, j:j+block_size] = weight_block_quant
+                block_idx += 1
+            }
+        }
+        
+        // Linear transformation
+        return linear(x, weight_quant, None)
+    }
+    
+    function quantize_block(block: Tensor, bits: int) -> Tensor {
+        // Quantize a block to specified bits
+        max_val = 2 ** (bits - 1) - 1
+        scale = max_abs(block) / max_val
+        
+        block_quant = round(block / scale)
+        block_quant = clamp(block_quant, -max_val, max_val)
+        block_dequant = block_quant * scale
+        
+        if self.training {
+            block_dequant = block_dequant + (block - stop_gradient(block))
+        }
+        
+        return block_dequant
+    }
+    
+    method get_precision_distribution() -> dict {
+        """Get the distribution of precisions across blocks"""
+        with no_grad() {
+            precision_idx = argmax(precision_logits, dim: 1)
+            
+            distribution = {}
+            for bits in bit_options {
+                count = sum((precision_idx == bit_options.index(bits)).float())
+                distribution[f"{bits}-bit"] = count / num_blocks
+            }
+            
+            return distribution
+        }
+    }
+}
+
+// Outlier-Aware Quantization
+layer OutlierAwareQuantization {
+    params {
+        bits: int = 4
+        outlier_threshold: float = 3.0  // Standard deviations
+        outlier_bits: int = 8
+    }
+    
+    forward(x: Tensor) -> Tensor {
+        // Detect outliers
+        mean_val = mean(x)
+        std_val = std(x)
+        
+        outlier_mask = abs(x - mean_val) > outlier_threshold * std_val
+        
+        // Quantize non-outliers with low precision
+        x_normal = x * (1 - outlier_mask.float())
+        x_normal_quant = quantize_tensor(x_normal, bits)
+        
+        // Quantize outliers with high precision
+        x_outlier = x * outlier_mask.float()
+        x_outlier_quant = quantize_tensor(x_outlier, outlier_bits)
+        
+        // Combine
+        x_quant = x_normal_quant + x_outlier_quant
+        
+        return x_quant
+    }
+    
+    function quantize_tensor(x: Tensor, bits: int) -> Tensor {
+        max_val = 2 ** (bits - 1) - 1
+        scale = max_abs(x) / max_val
+        
+        x_q = round(x / scale)
+        x_q = clamp(x_q, -max_val, max_val)
+        x_dq = x_q * scale
+        
+        if self.training {
+            x_dq = x_dq + (x - stop_gradient(x))
+        }
+        
+        return x_dq
+    }
+}
+
+// Example Model with Custom Quantization
+model CustomQuantizedResNet {
+    num_classes: 10
+    
+    // First layer: High precision
+    layer conv1: Conv2d {
+        in_channels: 3
+        out_channels: 64
+        kernel_size: 3
+        padding: 1
+    }
+    
+    layer bn1: BatchNorm2d { num_features: 64 }
+    
+    // Middle layers: LSQ quantization
+    layer stage1: Sequential {
+        LSQQuantization { bits: 4, per_channel: true, num_channels: 64 }
+        Conv2d { in_channels: 64, out_channels: 128, kernel_size: 3, padding: 1 }
+        BatchNorm2d { num_features: 128 }
+        ReLU {}
+    }
+    
+    // Later layers: Blockwise mixed precision
+    layer stage2: Sequential {
+        BlockwiseMixedQuantization {
+            in_features: 128 * 16 * 16
+            out_features: 256
+            block_size: 32
+            bit_options: [2, 4, 8]
+        }
+        BatchNorm1d { num_features: 256 }
+        ReLU {}
+    }
+    
+    // Output: Outlier-aware quantization
+    layer fc: Sequential {
+        OutlierAwareQuantization { bits: 4, outlier_bits: 8 }
+        Linear { in_features: 256, out_features: num_classes }
+    }
+    
+    forward(x: Tensor) -> Tensor {
+        x = conv1(x)
+        x = bn1(x)
+        x = relu(x)
+        
+        x = stage1(x)
+        x = flatten(x, 1)
+        x = stage2(x)
+        x = fc(x)
+        
+        return x
+    }
+    
+    method analyze_quantization() -> dict {
+        """Analyze quantization across the model"""
+        return {
+            "stage2_precision": stage2[0].get_precision_distribution(),
+            "total_bits": self.compute_total_bits(),
+            "compression_ratio": self.compute_compression_ratio()
+        }
+    }
+}
+
+// Example usage:
+// triton compile custom_quantization.triton --output custom_quant.py
+// python custom_quant.py --train --quantization-scheme lsq --bits 4
+// python custom_quant.py --analyze --checkpoint best.pth
