@@ -63,6 +63,26 @@ MODEL_ZOO = {
             'huggingface': 'financecommander/ternary-mobilenetv2-imagenet',
         }
     },
+    'ternary_credit_risk': {
+        'architecture': 'ternary_credit_risk',
+        'dataset': 'credit_risk_borrower_notes',
+        'num_classes': 3,
+        'input_shape': (1, 128),  # (batch, max_seq_length)
+        'description': 'Ternary text classifier for credit risk (Low/Medium/High) from borrower history notes',
+        'performance': {
+            'expected_accuracy': '80-90%',
+            'model_size_mb': 0.5,
+            'compression_ratio': 12.8
+        },
+        'urls': {
+            'github': 'https://github.com/financecommander/Triton/releases/download/v1.0.0-credit-risk/ternary_credit_risk.pth',
+        },
+        'extra': {
+            'tokenizer': 'tokenizer.json',
+            'labels': ['Low', 'Medium', 'High'],
+            'use_case': 'On-device credit risk analysis for Calculus Labs Lead Ranking Engine',
+        }
+    },
 }
 
 
@@ -260,27 +280,32 @@ def load_pretrained(
             print(f"✗ Model file not found: {cache_path}")
         return None
     
+    # Load checkpoint first (some models need metadata from it)
+    if verbose:
+        print(f"Loading {model_name}...")
+
+    checkpoint = torch.load(cache_path, map_location='cpu')
+
     # Load model architecture
     architecture = info['architecture']
     num_classes = info['num_classes']
-    
+
     if architecture == 'ternary_resnet18':
         from models.resnet18.ternary_resnet18 import ternary_resnet18
         model = ternary_resnet18(num_classes=num_classes)
     elif architecture == 'ternary_mobilenet_v2':
         from models.mobilenetv2.ternary_mobilenetv2 import ternary_mobilenet_v2
         model = ternary_mobilenet_v2(num_classes=num_classes)
+    elif architecture == 'ternary_credit_risk':
+        from models.credit_risk.ternary_credit_risk import TernaryCreditRiskNet
+        vocab_size = checkpoint.get('vocab_size', 5000)
+        model = TernaryCreditRiskNet(vocab_size=vocab_size)
     else:
         if verbose:
             print(f"✗ Unknown architecture: {architecture}")
         return None
-    
-    # Load checkpoint
-    if verbose:
-        print(f"Loading {model_name}...")
-    
-    checkpoint = torch.load(cache_path, map_location='cpu')
-    
+
+    # Load state dict
     if 'model_state_dict' in checkpoint:
         model.load_state_dict(checkpoint['model_state_dict'])
     else:
