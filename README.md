@@ -1,5 +1,11 @@
 # Triton DSL
 
+[![CI](https://github.com/financecommander/Triton/workflows/CI/badge.svg)](https://github.com/financecommander/Triton/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/triton-dsl)](https://pypi.org/project/triton-dsl/)
+[![Python](https://img.shields.io/pypi/pyversions/triton-dsl)](https://pypi.org/project/triton-dsl/)
+[![Documentation](https://img.shields.io/badge/docs-latest-blue)](https://financecommander.github.io/Triton)
+[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+
 **Domain-Specific Language for Ternary Neural Networks (TNNs)**
 
 ## Overview
@@ -145,13 +151,48 @@ triton compile examples/mnist_ternary.tri --output model.py
 - [Technical Specification](docs/specs/TECHNICAL_SPEC.md)
 - [Grammar Reference](docs/specs/GRAMMAR.md)
 - [Export & Publishing Guide](docs/EXPORT_GUIDE.md)
+- [CI/CD Guide](docs/CI_CD_GUIDE.md) - Complete CI/CD documentation
+- [CI/CD Quick Reference](docs/CI_CD_QUICK_REF.md) - Quick start guide
 - [API Documentation](docs/api/)
+
+## Development
+
+### CI/CD Pipeline
+
+This project uses GitHub Actions for continuous integration and deployment:
+
+- **Automated Testing**: Tests run on every PR across Python 3.10, 3.11, 3.12
+- **Code Quality**: Black, Ruff, and MyPy checks
+- **Multi-Platform**: Ubuntu, Windows, and macOS support
+- **Coverage**: Codecov integration for coverage tracking
+- **Auto-Publishing**: PyPI releases on version tags
+- **Documentation**: Auto-deploy to GitHub Pages
+
+See [CI/CD Guide](docs/CI_CD_GUIDE.md) for details.
+
+### Quick Commands
+
+```bash
+# Validate CI/CD setup
+bash scripts/validate_ci.sh
+
+# Run tests
+pip install -e ".[dev]"
+pytest tests/
+
+# Format and lint
+black .
+ruff check .
+```
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines.
+We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for:
+- Development setup
+- Code style guidelines
+- Testing requirements
+- Pull request process
 
 ## License
 
 MIT License - See [LICENSE](LICENSE)
- Principal Triton Language Designer &amp; ML Architect
