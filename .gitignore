@@ -58,14 +58,13 @@ Thumbs.db
 # Logs
 *.log
 
-# Examples outputs
-/data/
+# Example/scratch outputs (not checked in)
 /outputs/
 /example_exports/
-*.pth
-*.onnx
 
-# Model weights and checkpoints (but allow model zoo code)
+# Model weights and checkpoints — large files tracked via Git LFS
+# Do NOT add *.pth or data/*.jsonl to gitignore; they are LFS-managed.
+# Only ignore ad-hoc weights dropped into models/
 /models/checkpoints/
 /models/weights/
 /models/*.pth
