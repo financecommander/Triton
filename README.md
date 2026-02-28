@@ -12,6 +12,8 @@ Triton is a high-performance DSL designed to optimize Ternary Neural Networks by
 - **Zero-Cost Abstractions**: Compile-time type checking with runtime efficiency
 - **Hardware Optimization**: 2-bit packed storage, CUDA kernels, zero-skipping
 - **PyTorch Integration**: Seamless transpilation to PyTorch modules
+- **Full Compilation Pipeline**: Complete compiler with optimization, caching, and diagnostics
+- **Multiple Target Backends**: PyTorch, ONNX, TensorFlow Lite, and Python
 
 ## Architecture
 ```
@@ -19,9 +21,11 @@ Triton Source (.tri)
     ↓
 Lexer/Parser → AST
     ↓
-Type Checker
+Type Checker → Semantic Analyzer
     ↓
-Code Generator → PyTorch/CUDA
+IR Generation → Optimization (O0-O3)
+    ↓
+Code Generator → PyTorch/ONNX/TFLite/Python
 ```
 
 ## Performance Targets
@@ -61,6 +65,56 @@ Input (784) → LinearTernary(256) → TernaryActivation
 | Inference Latency | ~1.0 ms | ~0.7 ms (CPU) |
 
 See `examples/mnist_ternary.py` for full implementation details and documentation.
+
+## Compiler Usage
+
+Triton includes a comprehensive compiler with a powerful CLI and Python API.
+
+### CLI Interface
+
+```bash
+# Basic compilation
+triton compile model.triton
+
+# With optimization and target backend
+triton compile model.triton --O2 --target pytorch -o model.py
+
+# Show compilation statistics
+triton compile model.triton --statistics --optimization-report
+
+# Manage cache
+triton cache clear
+triton cache info
+```
+
+### Python API
+
+```python
+from triton.compiler.driver import compile_model
+
+# Compile a model
+result = compile_model(
+    'model.triton',
+    optimization_level=2,
+    target='pytorch',
+    verbose=True
+)
+
+if result.success:
+    print(f"Compiled to: {result.output_file}")
+    print(f"Time: {result.statistics.total_time:.3f}s")
+```
+
+### Features
+
+- **Optimization Levels**: O0 (none) to O3 (maximum)
+- **Multiple Backends**: PyTorch, ONNX, TensorFlow Lite, Python
+- **Intelligent Caching**: Incremental compilation with automatic cache invalidation
+- **Comprehensive Diagnostics**: Statistics, profiling, optimization reports
+- **Error Recovery**: Graceful failure with detailed error messages
+- **Progress Tracking**: Real-time progress bars and stage timing
+
+See [Compiler Documentation](docs/COMPILER_DRIVER.md) for complete details.
 
 ## Project Status
 
