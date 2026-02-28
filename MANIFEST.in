@@ -1,0 +1,32 @@
+# Include essential project files
+include LICENSE
+include README.md
+include CHANGELOG.md
+include MIGRATION.md
+include pyproject.toml
+
+# Include source packages
+recursive-include compiler *.py
+recursive-include backend *.py
+recursive-include kernels *.py *.cu *.cuh
+recursive-include examples *.py *.tri
+
+# Include documentation
+recursive-include docs *.md
+
+# Include templates
+recursive-include compiler/codegen *.j2
+recursive-include backend/pytorch *.j2
+
+# Exclude test and development files
+prune tests
+prune .github
+prune models/checkpoints
+prune models/weights
+
+# Exclude generated files
+global-exclude __pycache__
+global-exclude *.py[cod]
+global-exclude *.so
+global-exclude .DS_Store
+global-exclude *.egg-info
