@@ -9,10 +9,10 @@ Architecture:
   Embedding(vocab, 128) → TernaryLinear(128, 256) → TernaryLinear(256, 128) →
   TernaryLinear(128, 3)  [Low / Medium / High]
 
-  + Separate memo generation head for audit narrative.
+  + Compositional memo generation via risk factor extraction.
 
 Input:  Borrower history notes (tokenized text)
-Output: Risk flag (Low/Medium/High) + Audit memo
+Output: Risk flag (Low/Medium/High) + Contextual audit memo
 """
 
 import json
@@ -21,10 +21,11 @@ import torch
 import torch.nn as nn
 from typing import Optional
 
-import sys
-from pathlib import Path
-
 from backend.pytorch.ternary_tensor import TernaryLinear
+from models.credit_risk.memo_composer import (
+    extract_risk_factors,
+    compose_audit_memo,
+)
 
 
 # ── Tokenizer ───────────────────────────────────────────────────────
@@ -102,15 +103,6 @@ class CreditRiskTokenizer:
 RISK_LABELS = ["Low", "Medium", "High"]
 
 
-# ── Memo templates (used when model doesn't generate free-form) ─────
-
-MEMO_TEMPLATES = {
-    "Low": "Strong borrower profile with no significant risk indicators identified.",
-    "Medium": "Mixed borrower profile; elevated execution risk warrants additional due diligence.",
-    "High": "Significant risk factors identified including adverse credit events and financial distress indicators.",
-}
-
-
 # ── Model ───────────────────────────────────────────────────────────
 
 class TernaryCreditRiskNet(nn.Module):
@@ -178,14 +170,20 @@ class TernaryCreditRiskNet(nn.Module):
 
         return logits
 
-    def predict(self, input_ids: torch.Tensor) -> list[dict]:
+    def predict(
+        self,
+        input_ids: torch.Tensor,
+        raw_texts: Optional[list[str]] = None,
+    ) -> list[dict]:
         """Run inference and return structured risk assessments.
 
         Args:
             input_ids: (batch, seq_len) token IDs.
+            raw_texts: Optional original borrower notes for contextual
+                       memo generation. If None, falls back to generic memos.
 
         Returns:
-            List of {"Risk_Flag": str, "Audit_Memo": str} dicts.
+            List of dicts with Risk_Flag, Audit_Memo, and confidence.
         """
         self.eval()
         with torch.no_grad():
@@ -197,9 +195,15 @@ class TernaryCreditRiskNet(nn.Module):
         for i in range(preds.size(0)):
             flag = RISK_LABELS[preds[i].item()]
             confidence = probs[i, preds[i]].item()
-            memo = MEMO_TEMPLATES[flag]
-            if confidence < 0.6:
-                memo += " (Note: classification confidence is moderate; manual review recommended.)"
+
+            # Compose contextual memo from raw text if available
+            if raw_texts and i < len(raw_texts):
+                factors = extract_risk_factors(raw_texts[i])
+                memo = compose_audit_memo(flag, factors, confidence)
+            else:
+                # Fallback: minimal generic memo
+                memo = compose_audit_memo(flag, extract_risk_factors(""), confidence)
+
             results.append({
                 "Risk_Flag": flag,
                 "Audit_Memo": memo,
