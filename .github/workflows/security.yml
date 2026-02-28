@@ -1,0 +1,403 @@
+name: Security Scanning
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  # Dependency Scanning
+  dependency-scan:
+    name: Dependency Vulnerability Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+          pip install -e ".[dev,export,cuda,benchmark,examples]" || echo "Optional dependencies installation attempted"
+
+      - name: Run pip-audit
+        id: pip-audit
+        continue-on-error: true
+        run: |
+          pip install pip-audit
+          pip-audit --desc --format json --output pip-audit-report.json || true
+          pip-audit --desc
+
+      - name: Check pip-audit results
+        if: steps.pip-audit.outcome == 'failure'
+        run: |
+          echo "::warning::Critical vulnerabilities found by pip-audit"
+          if [ -f pip-audit-report.json ]; then
+            python -c "
+          import json
+          import sys
+          with open('pip-audit-report.json', 'r') as f:
+              data = json.load(f)
+              if isinstance(data, dict) and 'dependencies' in data:
+                  critical_count = sum(1 for dep in data['dependencies'] 
+                                      for vuln in dep.get('vulns', []) 
+                                      if 'Critical' in str(vuln))
+                  if critical_count > 0:
+                      print(f'Found {critical_count} critical vulnerabilities')
+                      sys.exit(1)
+          "
+          fi
+
+      - name: Run Safety check
+        id: safety
+        continue-on-error: true
+        run: |
+          pip install safety
+          safety check --json --output safety-report.json || true
+          safety check --output text
+
+      - name: Upload security reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-scan-reports
+          path: |
+            pip-audit-report.json
+            safety-report.json
+          retention-days: 30
+
+      - name: Create issue for critical vulnerabilities
+        if: failure() && github.event_name == 'schedule'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = '🚨 Critical Security Vulnerabilities Detected';
+            const body = `Critical vulnerabilities were detected in dependencies during scheduled security scan.
+            
+            **Scan Date:** ${new Date().toISOString()}
+            **Workflow:** ${{ github.workflow }}
+            **Run:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            
+            Please review the artifacts and address critical vulnerabilities immediately.
+            
+            ### Action Required
+            - Review pip-audit and Safety reports in workflow artifacts
+            - Update vulnerable dependencies
+            - Re-run security scan to verify fixes
+            
+            ---
+            *Automated security scan issue*`;
+            
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: title,
+              body: body,
+              labels: ['security', 'critical', 'dependencies']
+            });
+
+  # Python Code Security
+  python-security:
+    name: Python Security Analysis (Bandit)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Bandit
+        run: pip install bandit[toml]
+
+      - name: Run Bandit security scan
+        id: bandit
+        continue-on-error: true
+        run: |
+          bandit -r backend/ compiler/ models/ kernels/ \
+            -f json -o bandit-report.json \
+            -ll  # Only report medium and high severity
+          bandit -r backend/ compiler/ models/ kernels/ -ll
+
+      - name: Check Bandit results
+        if: steps.bandit.outcome == 'failure'
+        run: |
+          echo "::error::Security issues found by Bandit"
+          if [ -f bandit-report.json ]; then
+            python -c "
+          import json
+          import sys
+          with open('bandit-report.json', 'r') as f:
+              data = json.load(f)
+              high_severity = [r for r in data.get('results', []) if r.get('issue_severity') == 'HIGH']
+              if len(high_severity) > 0:
+                  print(f'Found {len(high_severity)} high severity issues')
+                  for issue in high_severity[:5]:
+                      print(f\"  - {issue.get('test_id')}: {issue.get('issue_text')} ({issue.get('filename')}:{issue.get('line_number')})\")
+                  sys.exit(1)
+          "
+          fi
+
+      - name: Upload Bandit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bandit-report
+          path: bandit-report.json
+          retention-days: 30
+
+      - name: Create issue for high severity findings
+        if: failure() && (github.event_name == 'schedule' || github.event_name == 'push')
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = '⚠️ High Severity Security Issues Found (Bandit)';
+            const body = `Bandit detected high severity security issues in the Python codebase.
+            
+            **Scan Date:** ${new Date().toISOString()}
+            **Workflow:** ${{ github.workflow }}
+            **Run:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            
+            Please review the Bandit report and address the issues.
+            
+            ### Common Issues to Check
+            - Hardcoded passwords or secrets
+            - Use of unsafe functions (pickle, eval, exec)
+            - SQL injection vulnerabilities
+            - Command injection risks
+            - Insecure cryptography
+            
+            ---
+            *Automated security scan issue*`;
+            
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: title,
+              body: body,
+              labels: ['security', 'code-quality']
+            });
+
+  # CodeQL Analysis
+  codeql-analysis:
+    name: CodeQL Security Analysis
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ 'python' ]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          queries: security-extended,security-and-quality
+          config: |
+            paths-ignore:
+              - tests
+              - examples
+              - docs
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"
+          upload: true
+
+  # Secret Scanning (requires GitHub Advanced Security for private repos)
+  secret-scan:
+    name: Secret Scanning Check
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: TruffleHog Secret Scan
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: ${{ github.event.pull_request.base.sha }}
+          head: ${{ github.event.pull_request.head.sha }}
+          extra_args: --only-verified
+
+      - name: GitLeaks Secret Scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Container Security (if Docker images exist)
+  container-security:
+    name: Container Security Scan
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check for Dockerfiles
+        id: check-docker
+        run: |
+          if find . -name "Dockerfile*" -type f | grep -q .; then
+            echo "has_docker=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_docker=false" >> $GITHUB_OUTPUT
+            echo "No Dockerfiles found, skipping container scan"
+          fi
+
+      - name: Run Trivy vulnerability scanner
+        if: steps.check-docker.outputs.has_docker == 'true'
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH,MEDIUM'
+          exit-code: '0'
+
+      - name: Upload Trivy results to GitHub Security
+        if: steps.check-docker.outputs.has_docker == 'true'
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+      - name: Run Trivy in table format
+        if: steps.check-docker.outputs.has_docker == 'true'
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'table'
+          severity: 'CRITICAL,HIGH,MEDIUM'
+
+  # Security Summary and PR Blocking
+  security-gate:
+    name: Security Gate
+    runs-on: ubuntu-latest
+    needs: [dependency-scan, python-security, codeql-analysis]
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Check security scan results
+        run: |
+          echo "Security scans completed"
+          
+          # Check if any job failed
+          if [ "${{ needs.dependency-scan.result }}" == "failure" ]; then
+            echo "::error::Dependency scan found critical vulnerabilities"
+            exit 1
+          fi
+          
+          if [ "${{ needs.python-security.result }}" == "failure" ]; then
+            echo "::error::Python security scan found high severity issues"
+            exit 1
+          fi
+          
+          if [ "${{ needs.codeql-analysis.result }}" == "failure" ]; then
+            echo "::error::CodeQL analysis found security issues"
+            exit 1
+          fi
+          
+          echo "✓ All security checks passed"
+
+      - name: Add PR comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const needs = ${{ toJSON(needs) }};
+            let status = '✅ All security checks passed';
+            let details = [];
+            
+            if (needs['dependency-scan'].result === 'failure') {
+              status = '❌ Security issues detected';
+              details.push('- ❌ Dependency vulnerabilities found');
+            } else {
+              details.push('- ✅ No dependency vulnerabilities');
+            }
+            
+            if (needs['python-security'].result === 'failure') {
+              status = '❌ Security issues detected';
+              details.push('- ❌ Python security issues found');
+            } else {
+              details.push('- ✅ No Python security issues');
+            }
+            
+            if (needs['codeql-analysis'].result === 'failure') {
+              status = '❌ Security issues detected';
+              details.push('- ❌ CodeQL found security issues');
+            } else {
+              details.push('- ✅ CodeQL analysis passed');
+            }
+            
+            const body = `## Security Scan Results
+            
+            ${status}
+            
+            ${details.join('\n')}
+            
+            **Workflow:** ${{ github.workflow }}
+            **Run:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            
+            ${status.includes('❌') ? '**Action Required:** Please review and fix the security issues before merging.' : ''}`;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });
+
+  # Security notifications
+  notify:
+    name: Security Notifications
+    runs-on: ubuntu-latest
+    needs: [dependency-scan, python-security, codeql-analysis]
+    if: always() && (github.event_name == 'schedule' || github.event_name == 'push')
+    steps:
+      - name: Send summary notification
+        run: |
+          echo "Security scan summary:"
+          echo "  Dependency scan: ${{ needs.dependency-scan.result }}"
+          echo "  Python security: ${{ needs.python-security.result }}"
+          echo "  CodeQL analysis: ${{ needs.codeql-analysis.result }}"
+          
+          if [ "${{ needs.dependency-scan.result }}" == "failure" ] || \
+             [ "${{ needs.python-security.result }}" == "failure" ] || \
+             [ "${{ needs.codeql-analysis.result }}" == "failure" ]; then
+            echo "::warning::Security issues detected. Check the workflow run for details."
+          else
+            echo "::notice::All security scans passed successfully"
+          fi

@@ -70,3 +70,17 @@ Thumbs.db
 /models/weights/
 /models/*.pth
 /models/*.onnx
+
+# Security scan reports
+pip-audit-report.json
+safety-report.json
+bandit-report.json
+trivy-results.sarif
+gitleaks-report.json
+trufflehog-report.json
+.secrets.baseline
+
+# Training outputs
+/checkpoints/
+/logs/
+/results/
