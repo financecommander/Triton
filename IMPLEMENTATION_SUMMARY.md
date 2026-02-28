@@ -225,11 +225,14 @@ All requirements from the problem statement have been met:
 - All code is syntactically correct and ready for GPU testing
 
 ### Future Enhancements
-- [ ] CPU fallback implementation
-- [ ] Batched matrix multiplication
-- [ ] Dynamic tile size selection
-- [ ] Mixed precision output options
-- [ ] Integration with PyTorch autograd
+- [ ] CPU fallback with SIMD-accelerated ternary matmul (AVX2/NEON)
+- [ ] Batched matrix multiplication for transformer attention patterns
+- [ ] Dynamic tile size selection based on matrix dimensions and GPU occupancy
+- [ ] Mixed precision output options (int8, fp16, fp32)
+- [ ] Integration with PyTorch autograd — ternary matmul as differentiable op
+- [ ] Fused kernel chains — matmul + activation + quantize in single GPU launch
+- [ ] Sparse tile skipping — detect and skip all-zero blocks at the tile level
+- [ ] Profiling hooks — per-kernel timing and occupancy reporting
 
 ## Conclusion
 

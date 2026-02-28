@@ -267,14 +267,21 @@ python -m pytest tests/unit/test_export.py -v
 
 ## Future Enhancements
 
-Potential improvements for future work:
-1. TensorRT optimization support
-2. TFLite export for mobile
-3. ONNX.js export for web
-4. Automatic CI/CD publishing on release tags
-5. Model versioning and changelog tracking
-6. Benchmark comparisons in model cards
-7. Interactive model zoo web interface
+**Export targets:**
+1. TensorRT optimization — INT8 calibration from ternary weights for deployment
+2. TFLite export — mobile-optimized ternary inference with 2-bit custom ops
+3. ONNX.js export — browser-based ternary inference
+4. CoreML export — Apple Neural Engine with ternary weight packing
+
+**Automation and workflow:**
+5. CI/CD publishing on release tags — GitHub Actions auto-export on `v*` tags
+6. Model versioning and changelog tracking — semantic versioning with diff reports
+7. Benchmark comparisons embedded in model cards — auto-generated performance tables
+8. A/B export validation — compare ONNX vs PyTorch output across test inputs
+
+**Discovery:**
+9. Interactive model zoo web interface — browse, compare, and download ternary models
+10. HuggingFace Spaces demo — live inference playground for published models
 
 ## Conclusion
 

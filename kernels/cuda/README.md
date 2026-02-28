@@ -140,8 +140,11 @@ python tests/test_ternary_matmul.py
 
 ## Future Improvements
 
-- [ ] Support for non-square matrices with better padding
-- [ ] Batched matrix multiplication
-- [ ] Support for different tile sizes based on problem size
-- [ ] CPU fallback implementation
-- [ ] Mixed precision output (int8, fp16, fp32)
+- [ ] Batched matrix multiplication (batch dimension for transformer attention)
+- [ ] Dynamic tile size selection — auto-select 8x8, 16x16, 32x32 based on matrix geometry
+- [ ] Non-square matrix padding with minimal waste
+- [ ] CPU fallback with SIMD (AVX2/NEON) ternary matmul
+- [ ] Mixed precision output (int8, fp16, fp32) selectable at call site
+- [ ] Fused ternary matmul + activation kernel (eliminate intermediate memory writes)
+- [ ] Sparse block detection — skip entire zero tiles during matmul
+- [ ] Kernel fusion for ternary conv2d (im2col + packed matmul in single launch)

@@ -147,7 +147,10 @@ Compared to FP32 storage:
 
 ## Future Enhancements
 
-- [ ] CUDA kernel integration for GPU acceleration
-- [ ] Sparse computation optimization (skip zeros)
-- [ ] Training support with ternary gradients
-- [ ] Quantization-aware training hooks
+- [ ] Direct CUDA/Triton kernel dispatch from generated modules (bypass PyTorch matmul)
+- [ ] Sparse computation graph — compile-time zero elimination in generated forward pass
+- [ ] Quantization-aware training (QAT) hooks with gradient scaling
+- [ ] Ternary gradient accumulators for communication-efficient distributed training
+- [ ] Selective quantization policy — preserve specified layers (norms, embeddings, output heads) during codegen
+- [ ] Multi-backend template targets — generate TensorRT, TFLite, ONNX.js alongside PyTorch
+- [ ] Diffusion model codegen — UNet layer definitions in .tri with conditional ternary conversion

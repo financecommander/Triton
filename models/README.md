@@ -218,14 +218,21 @@ for epoch in range(100):
 - [x] Model Zoo registry
 
 ### 🚧 In Progress
-- [ ] BERT-tiny (ternary)
-- [ ] EfficientNet-Lite
-- [ ] Model conversion tools
+- [ ] BERT-tiny (ternary) — attention and FFN layers implemented, training validation pending
+- [ ] EfficientNet-Lite — ternary variant
+- [ ] Model conversion tools — FP32/FP16 pretrained to ternary
 
-### 📋 Planned
-- [ ] TensorRT optimization
-- [ ] Mobile deployment (TFLite)
+### 📋 Planned — New Architectures
+- [ ] Ternary UNet (Stable Diffusion) — selective quantization of Conv2d/Linear, preserving norms
+- [ ] Ternary LLM adapter — post-training quantization for Phi-3, Gemma, Qwen2, TinyLlama class models
+- [ ] Vision Transformer (ViT-tiny) — ternary attention and MLP blocks
+
+### 📋 Planned — Infrastructure
+- [ ] TensorRT optimization backend
+- [ ] Mobile deployment (TFLite export)
 - [ ] Web deployment (ONNX.js)
+- [ ] Selective layer skipping — preserve embeddings, norms, and output heads during quantization
+- [ ] Ternary-aware pruning — combine sparsity scheduling with ternary constraints
 
 ## 🚀 Publishing Models
 

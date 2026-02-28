@@ -1,3 +1,42 @@
+## [Unreleased]
+
+### Planned
+- End-to-end DSL compilation (`triton compile model.tri --output model.py`)
+- Diffusion model support — ternary UNet quantization
+- LLM post-training quantization with selective layer preservation
+- Batched ternary matmul kernels
+- PyTorch autograd integration for ternary ops
+- Fused kernel chains (matmul + activation in single launch)
+- CPU fallback with SIMD acceleration (AVX2/NEON)
+- TensorRT / TFLite / ONNX.js export targets
+
+## [0.3.0] - 2026-02-27
+
+### Added
+- **Training Infrastructure**
+  - CIFAR-10 and MNIST full training pipelines
+  - CutMix, MixUp, AutoAugment, RandAugment data augmentation
+  - Label smoothing cross-entropy loss
+  - Early stopping with configurable patience
+  - Checkpoint resume with full state restoration
+  - TensorBoard and CSV logging
+  - DDP distributed training support
+- **Model Zoo**
+  - ResNet-18 ternary (CIFAR-10: 90-92% accuracy target)
+  - MobileNetV2 ternary with inverted residuals
+  - BERT-tiny ternary (attention + feed-forward)
+  - Credit Risk NN with custom tokenizer
+- **Export Pipeline**
+  - ONNX export with validation and optimization
+  - Hugging Face Hub publishing with model cards
+  - GitHub Releases with automated packaging
+- **Testing**
+  - 25 test files across unit, integration, stress, fuzzing, property-based, and security
+  - Benchmark suite for inference, matmul, and memory
+
+### Changed
+- Project status updated from "Phase 1: Compiler Frontend" to reflect completed state
+
 ## [0.2.0] - 2026-02-13
 
 ### Added

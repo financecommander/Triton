@@ -64,94 +64,78 @@ See `examples/mnist_ternary.py` for full implementation details and documentatio
 
 ## Project Status
 
-🚧 **Active Development** - Phase 1: Compiler Frontend
+### Completed
+- **Compiler Frontend** — Lexer (PLY), parser (LALR), AST (17 node types), type checker with symbol tables
+- **PyTorch Backend** — TernaryTensor, TernaryLinear, TernaryConv2d, code generation via Jinja2 templates
+- **Quantization** — Deterministic and stochastic methods with Straight-Through Estimator (STE)
+- **2-Bit Packing** — 4 trits per byte, 32x compression vs FP32, CPU and GPU pack/unpack
+- **CUDA Kernels** — Packed ternary matmul with 16x16 tiling, shared memory, zero-skipping, warp reduction
+- **Triton GPU Backend** — Auto-tuned kernels (100+ configs), multi-platform (CUDA/ROCm/Metal)
+- **Model Zoo** — ResNet-18, MobileNetV2, BERT-tiny, MNIST/CIFAR-10 CNNs, Credit Risk NN
+- **Training** — CutMix, MixUp, AutoAugment, label smoothing, early stopping, DDP, TensorBoard
+- **Export** — ONNX (with validation), Hugging Face Hub, GitHub Releases
+- **Testing** — 25 test files: unit, integration, stress, fuzzing, property-based, security, benchmarks
+
+### Roadmap
+
+**Near-term**
+- [ ] End-to-end DSL compilation (`triton compile model.tri --output model.py`)
+- [ ] Diffusion model support — ternary UNet quantization (validated in research at 15x compression)
+- [ ] LLM post-training quantization — selective layer conversion preserving embeddings/norms/lm_head
+- [ ] Batched matrix multiplication kernels
+- [ ] PyTorch autograd integration for ternary kernels
+- [ ] CLI tool for compilation and model management
+
+**Mid-term**
+- [ ] Quantization-aware training (QAT) hooks
+- [ ] Mixed precision output (int8, fp16, fp32)
+- [ ] EfficientNet-Lite ternary variant
+- [ ] TensorRT optimization backend
+- [ ] Dynamic tile size selection based on problem geometry
+- [ ] Model conversion tools (FP32/FP16 pretrained → ternary)
+
+**Long-term**
+- [ ] Mobile deployment (TFLite export)
+- [ ] Web deployment (ONNX.js)
+- [ ] Ternary-aware pruning and sparsity scheduling
+- [ ] Multi-bit quantization (2-bit, 4-bit) alongside ternary
+- [ ] Visual pipeline editor for model composition
+- [ ] Federated learning with ternary compression
 
 ## Quick Start
 
-### Running the MNIST Example
-
-The project includes a complete MNIST training example demonstrating ternary neural networks:
-
 ```bash
-# Install dependencies
-pip install torch torchvision numpy matplotlib seaborn scikit-learn
-
-# Run MNIST training with default settings (10 epochs)
-python examples/mnist_ternary.py
-
-# Custom training configuration
-python examples/mnist_ternary.py --epochs 20 --batch-size 128 --lr 0.001
-
-# Use stochastic quantization
-python examples/mnist_ternary.py --quantize-method stochastic
-
-# Save trained model
-python examples/mnist_ternary.py --save-path ./models/mnist_ternary.pth
-
-# Run unit tests
-python examples/test_mnist_ternary.py
-```
-
-**Expected Results:**
-- Test accuracy: ~96-97% (compared to ~98.5% for float32 baseline)
-- Model size: ~0.06 MB (16x smaller than float32)
-- Inference: 2-3x faster on optimized hardware
-
-### Model Export & Publishing
-
-Export and publish your trained ternary models:
-
-```bash
-# Install export dependencies
-pip install -e ".[export]"
-
-# Export to ONNX
-python models/scripts/publish_model.py \
-    --model resnet18 \
-    --checkpoint model.pth \
-    --export-onnx
-
-# Publish to Hugging Face Hub
-python models/scripts/publish_model.py \
-    --model resnet18 \
-    --checkpoint model.pth \
-    --hf-repo username/ternary-resnet18
-
-# Create GitHub Release
-python models/scripts/publish_model.py \
-    --model resnet18 \
-    --checkpoint model.pth \
-    --github-release v1.0.0 \
-    --github-repo username/Triton
-```
-
-See [Export Guide](docs/EXPORT_GUIDE.md) for detailed documentation.
-
-### Compiler Development
-
-```bash
-# Install development dependencies
+# Install
 pip install -e ".[dev]"
 
 # Run compiler tests
 pytest tests/
 
-# Future: Compile Triton DSL to PyTorch
+# Train MNIST ternary network
+python examples/mnist_ternary.py --epochs 20 --batch-size 128
+
+# Train CIFAR-10 with full augmentation
+python models/scripts/train_ternary_models.py \
+    --model resnet18 --dataset cifar10 --epochs 500 \
+    --early_stopping --cutmix --label_smoothing 0.1
+
+# Export to ONNX
+python models/scripts/publish_model.py \
+    --model resnet18 --checkpoint model.pth --export-onnx
+
+# Future: compile .tri source to PyTorch
 triton compile examples/mnist_ternary.tri --output model.py
 ```
 
 ## Documentation
 
-- [Technical Specification](docs/specs/TECHNICAL_SPEC.md)
-- [Grammar Reference](docs/specs/GRAMMAR.md)
 - [Export & Publishing Guide](docs/EXPORT_GUIDE.md)
-- [API Documentation](docs/api/)
-
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines.
+- [CIFAR-10 Training Guide](docs/CIFAR10_TRAINING_GUIDE.md)
+- [PyTorch Backend](backend/pytorch/README.md)
+- [CUDA Kernels](kernels/cuda/README.md)
+- [Triton GPU Backend](kernels/triton/README.md)
+- [Model Zoo](models/README.md)
 
 ## License
 
 MIT License - See [LICENSE](LICENSE)
- Principal Triton Language Designer &amp; ML Architect
