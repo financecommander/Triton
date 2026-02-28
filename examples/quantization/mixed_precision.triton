@@ -1,0 +1,376 @@
+// Mixed Precision Neural Network
+// Demonstrates strategic bit-width allocation across layers
+
+model MixedPrecisionResNet {
+    // Model configuration
+    num_classes: 10
+    
+    // Mixed precision strategy
+    quantization {
+        strategy: "mixed_precision"
+        
+        // Layer-wise precision allocation
+        precision_map: {
+            first_conv: "float16"      // Input layer: higher precision
+            stage1: "int8"              // Early layers: moderate precision
+            stage2: "ternary"           // Middle layers: aggressive quantization
+            stage3: "ternary"           // Middle layers: aggressive quantization
+            stage4: "int4"              // Later layers: low precision
+            final_fc: "float16"         // Output layer: higher precision
+        }
+        
+        // Sensitivity-aware allocation
+        sensitivity_based: true
+        sensitivity_threshold: 0.1     // Accuracy drop threshold
+        
+        // Hardware-aware optimization
+        target_hardware: "edge_tpu"
+        optimize_for: "latency"        // or "memory", "energy"
+    }
+    
+    // First convolution (FP16 for input sensitivity)
+    layer conv1: Float16Conv2d {
+        in_channels: 3
+        out_channels: 64
+        kernel_size: 3
+        stride: 1
+        padding: 1
+        bias: false
+    }
+    
+    layer bn1: BatchNorm2d { num_features: 64 }
+    layer relu: ReLU {}
+    
+    // Stage 1: INT8 quantization
+    layer stage1: MixedPrecisionStage {
+        num_blocks: 2
+        in_channels: 64
+        out_channels: 64
+        stride: 1
+        precision: "int8"
+    }
+    
+    // Stage 2: Ternary quantization
+    layer stage2: MixedPrecisionStage {
+        num_blocks: 2
+        in_channels: 64
+        out_channels: 128
+        stride: 2
+        precision: "ternary"
+    }
+    
+    // Stage 3: Ternary quantization
+    layer stage3: MixedPrecisionStage {
+        num_blocks: 2
+        in_channels: 128
+        out_channels: 256
+        stride: 2
+        precision: "ternary"
+    }
+    
+    // Stage 4: INT4 quantization
+    layer stage4: MixedPrecisionStage {
+        num_blocks: 2
+        in_channels: 256
+        out_channels: 512
+        stride: 2
+        precision: "int4"
+    }
+    
+    layer avgpool: AdaptiveAvgPool2d { output_size: (1, 1) }
+    
+    // Final layer (FP16 for classification accuracy)
+    layer fc: Float16Linear {
+        in_features: 512
+        out_features: num_classes
+    }
+    
+    forward(x: Tensor) -> Tensor {
+        // Convert input to FP16
+        x = x.half()
+        
+        x = conv1(x)
+        x = bn1(x)
+        x = relu(x)
+        
+        x = stage1(x)  // INT8
+        x = stage2(x)  // Ternary
+        x = stage3(x)  // Ternary
+        x = stage4(x)  // INT4
+        
+        x = avgpool(x)
+        x = flatten(x, 1)
+        x = fc(x)
+        
+        // Convert back to FP32 for loss computation
+        x = x.float()
+        
+        return x
+    }
+    
+    training {
+        optimizer: "adam"
+        learning_rate: 0.001
+        batch_size: 128
+        epochs: 120
+        
+        // Progressive quantization
+        quantization_schedule: {
+            phase1: {
+                epochs: [0, 30]
+                precision: "float32"     // Warmup
+            }
+            phase2: {
+                epochs: [30, 60]
+                precision: "mixed"       // Gradual quantization
+                quantization_prob: 0.5   // 50% layers quantized
+            }
+            phase3: {
+                epochs: [60, 120]
+                precision: "mixed"       // Full mixed precision
+                quantization_prob: 1.0   // All layers quantized
+            }
+        }
+        
+        // Precision-specific learning rates
+        lr_per_precision: {
+            float16: 0.001
+            int8: 0.0005
+            int4: 0.0002
+            ternary: 0.0003
+        }
+        
+        gradient_estimator: "STE"
+        loss: "cross_entropy"
+    }
+    
+    performance {
+        expected_accuracy: 0.89        // 89% on CIFAR-10
+        model_size_mb: 1.8             // Mixed precision savings
+        avg_bit_width: 5.2             // Average bits per weight
+        inference_ms: 12               // GPU inference
+        compression_ratio: 6.2         // vs float32
+        
+        // Per-stage memory usage
+        memory_breakdown: {
+            conv1: 0.15                // 8% of total
+            stage1: 0.40               // 22%
+            stage2: 0.30               // 17%
+            stage3: 0.35               // 19%
+            stage4: 0.45               // 25%
+            fc: 0.15                   // 8%
+        }
+    }
+}
+
+// Mixed Precision Stage
+block MixedPrecisionStage {
+    params {
+        num_blocks: int
+        in_channels: int
+        out_channels: int
+        stride: int
+        precision: str  // "float16", "int8", "int4", "ternary"
+    }
+    
+    layer blocks: ResidualBlock[num_blocks] {
+        in_channels: in_channels
+        out_channels: out_channels
+        stride: stride
+        precision: precision
+    }
+    
+    forward(x: Tensor) -> Tensor {
+        return blocks(x)
+    }
+}
+
+// Precision-Adaptive Residual Block
+block ResidualBlock {
+    params {
+        in_channels: int
+        out_channels: int
+        stride: int
+        precision: str
+    }
+    
+    // Select convolution based on precision
+    layer conv1: switch (precision) {
+        "float16" -> Float16Conv2d {
+            in_channels: in_channels
+            out_channels: out_channels
+            kernel_size: 3
+            stride: stride
+            padding: 1
+            bias: false
+        }
+        "int8" -> INT8Conv2d {
+            in_channels: in_channels
+            out_channels: out_channels
+            kernel_size: 3
+            stride: stride
+            padding: 1
+            bias: false
+        }
+        "int4" -> INT4Conv2d {
+            in_channels: in_channels
+            out_channels: out_channels
+            kernel_size: 3
+            stride: stride
+            padding: 1
+            bias: false
+        }
+        "ternary" -> TernaryConv2d {
+            in_channels: in_channels
+            out_channels: out_channels
+            kernel_size: 3
+            stride: stride
+            padding: 1
+            quantization: "deterministic"
+            bias: false
+        }
+    }
+    
+    layer bn1: BatchNorm2d { num_features: out_channels }
+    
+    layer conv2: switch (precision) {
+        "float16" -> Float16Conv2d {
+            in_channels: out_channels
+            out_channels: out_channels
+            kernel_size: 3
+            stride: 1
+            padding: 1
+            bias: false
+        }
+        "int8" -> INT8Conv2d {
+            in_channels: out_channels
+            out_channels: out_channels
+            kernel_size: 3
+            stride: 1
+            padding: 1
+            bias: false
+        }
+        "int4" -> INT4Conv2d {
+            in_channels: out_channels
+            out_channels: out_channels
+            kernel_size: 3
+            stride: 1
+            padding: 1
+            bias: false
+        }
+        "ternary" -> TernaryConv2d {
+            in_channels: out_channels
+            out_channels: out_channels
+            kernel_size: 3
+            stride: 1
+            padding: 1
+            quantization: "deterministic"
+            bias: false
+        }
+    }
+    
+    layer bn2: BatchNorm2d { num_features: out_channels }
+    
+    layer downsample: if (stride != 1 or in_channels != out_channels) {
+        switch (precision) {
+            "float16" -> Float16Conv2d {
+                in_channels: in_channels
+                out_channels: out_channels
+                kernel_size: 1
+                stride: stride
+                bias: false
+            }
+            "int8" -> INT8Conv2d {
+                in_channels: in_channels
+                out_channels: out_channels
+                kernel_size: 1
+                stride: stride
+                bias: false
+            }
+            "int4" -> INT4Conv2d {
+                in_channels: in_channels
+                out_channels: out_channels
+                kernel_size: 1
+                stride: stride
+                bias: false
+            }
+            "ternary" -> TernaryConv2d {
+                in_channels: in_channels
+                out_channels: out_channels
+                kernel_size: 1
+                stride: stride
+                quantization: "deterministic"
+                bias: false
+            }
+        }
+        BatchNorm2d { num_features: out_channels }
+    }
+    
+    forward(x: Tensor) -> Tensor {
+        identity = x
+        
+        out = conv1(x)
+        out = bn1(out)
+        out = relu(out)
+        
+        out = conv2(out)
+        out = bn2(out)
+        
+        if downsample is not None {
+            identity = downsample(x)
+        }
+        
+        out += identity
+        out = relu(out)
+        
+        return out
+    }
+}
+
+// Precision-specific layers
+layer Float16Conv2d extends Conv2d {
+    dtype: "float16"
+}
+
+layer Float16Linear extends Linear {
+    dtype: "float16"
+}
+
+layer INT8Conv2d extends QuantizedConv2d {
+    bits: 8
+    symmetric: true
+}
+
+layer INT4Conv2d extends QuantizedConv2d {
+    bits: 4
+    symmetric: true
+}
+
+// Automatic Mixed Precision Search
+optimizer AutoMixedPrecision {
+    // Search space
+    precision_options: ["float16", "int8", "int4", "ternary", "binary"]
+    
+    // Search strategy
+    search_method: "evolutionary"  // or "reinforcement_learning", "gradient_based"
+    
+    // Constraints
+    constraints: {
+        max_model_size_mb: 5.0
+        min_accuracy: 0.88
+        max_latency_ms: 15
+    }
+    
+    // Optimization objective
+    objective: "minimize_latency"  // or "minimize_size", "maximize_accuracy"
+    
+    // Search parameters
+    population_size: 20
+    generations: 50
+    mutation_rate: 0.1
+}
+
+// Example usage:
+// triton compile mixed_precision.triton --output mixed_precision.py
+// python mixed_precision.py --train --dataset cifar10 --mixed-precision --epochs 120
+// python mixed_precision.py --search-precision --objective latency --constraint accuracy=0.88

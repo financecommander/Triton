@@ -1,0 +1,304 @@
+// Ternary Vision Transformer for Image Classification
+// Demonstrates attention mechanisms with ternary quantization
+
+model TernaryViT {
+    // Model configuration
+    image_size: 224
+    patch_size: 16
+    num_classes: 1000
+    dim: 768                // Embedding dimension
+    depth: 12               // Number of transformer blocks
+    heads: 12               // Number of attention heads
+    mlp_dim: 3072          // MLP hidden dimension
+    dropout: 0.1
+    
+    // Patch embedding
+    layer patch_embed: PatchEmbedding {
+        image_size: image_size
+        patch_size: patch_size
+        in_channels: 3
+        embed_dim: dim
+    }
+    
+    // Positional embedding (learnable)
+    param pos_embedding: Tensor[1, num_patches + 1, dim] {
+        init: "normal"
+        std: 0.02
+    }
+    
+    // Class token
+    param cls_token: Tensor[1, 1, dim] {
+        init: "normal"
+        std: 0.02
+    }
+    
+    layer dropout: Dropout { p: dropout }
+    
+    // Transformer encoder blocks
+    layer transformer: TransformerEncoder[depth] {
+        dim: dim
+        heads: heads
+        mlp_dim: mlp_dim
+        dropout: dropout
+        quantization: "ternary"
+    }
+    
+    layer norm: LayerNorm {
+        normalized_shape: dim
+    }
+    
+    // Classification head
+    layer head: TernaryLinear {
+        in_features: dim
+        out_features: num_classes
+        quantization: "deterministic"
+    }
+    
+    // Forward pass
+    forward(x: Tensor[batch_size, 3, 224, 224]) -> Tensor[batch_size, num_classes] {
+        batch_size = x.shape[0]
+        
+        // Patch embedding
+        x = patch_embed(x)  // [B, num_patches, dim]
+        
+        // Add class token
+        cls_tokens = repeat(cls_token, batch_size)
+        x = concatenate([cls_tokens, x], dim: 1)
+        
+        // Add positional embedding
+        x = x + pos_embedding
+        x = dropout(x)
+        
+        // Transformer blocks
+        x = transformer(x)
+        
+        // Classification from class token
+        x = norm(x)
+        cls = x[:, 0]  // Extract class token
+        logits = head(cls)
+        
+        return logits
+    }
+    
+    // Training configuration
+    training {
+        optimizer: "adamw"
+        learning_rate: 0.001
+        weight_decay: 0.05
+        batch_size: 512
+        epochs: 300
+        
+        // Learning rate schedule with warmup
+        lr_schedule: {
+            type: "cosine"
+            warmup_epochs: 10
+            min_lr: 1e-6
+        }
+        
+        // Data augmentation
+        augmentation: {
+            random_resized_crop: [224, 224]
+            random_horizontal_flip: 0.5
+            rand_augment: {
+                num_ops: 2
+                magnitude: 9
+            }
+            mixup: {
+                alpha: 0.2
+            }
+            cutmix: {
+                alpha: 1.0
+            }
+            normalize: {
+                mean: [0.485, 0.456, 0.406]
+                std: [0.229, 0.224, 0.225]
+            }
+        }
+        
+        gradient_estimator: "STE"
+        loss: "cross_entropy"
+        label_smoothing: 0.1
+    }
+    
+    // Expected performance
+    performance {
+        expected_top1_accuracy: 0.75   // 75% Top-1 on ImageNet
+        expected_top5_accuracy: 0.92   // 92% Top-5
+        model_size_mb: 22              // vs 330MB float32 (15x compression)
+        inference_ms: 25               // GPU inference time
+        attention_ops: 16.8B           // Attention operations
+        compression_ratio: 15          // vs float32 baseline
+        num_patches: 196               // (224/16)^2
+    }
+}
+
+// Patch Embedding Layer
+layer PatchEmbedding {
+    params {
+        image_size: int
+        patch_size: int
+        in_channels: int
+        embed_dim: int
+    }
+    
+    num_patches: int = (image_size / patch_size) ** 2
+    
+    layer projection: TernaryConv2d {
+        in_channels: in_channels
+        out_channels: embed_dim
+        kernel_size: patch_size
+        stride: patch_size
+        quantization: "deterministic"
+    }
+    
+    forward(x: Tensor) -> Tensor {
+        x = projection(x)  // [B, embed_dim, H, W]
+        x = flatten(x, start_dim: 2)  // [B, embed_dim, num_patches]
+        x = transpose(x, 1, 2)  // [B, num_patches, embed_dim]
+        return x
+    }
+}
+
+// Transformer Encoder Block
+block TransformerEncoder {
+    params {
+        dim: int
+        heads: int
+        mlp_dim: int
+        dropout: float
+        quantization: str = "ternary"
+    }
+    
+    // Multi-head attention
+    layer norm1: LayerNorm {
+        normalized_shape: dim
+    }
+    
+    layer attn: MultiHeadAttention {
+        embed_dim: dim
+        num_heads: heads
+        dropout: dropout
+        quantization: quantization
+    }
+    
+    // MLP
+    layer norm2: LayerNorm {
+        normalized_shape: dim
+    }
+    
+    layer mlp: MLP {
+        in_features: dim
+        hidden_features: mlp_dim
+        out_features: dim
+        dropout: dropout
+        quantization: quantization
+    }
+    
+    forward(x: Tensor) -> Tensor {
+        // Attention block with residual
+        x = x + attn(norm1(x))
+        
+        // MLP block with residual
+        x = x + mlp(norm2(x))
+        
+        return x
+    }
+}
+
+// Multi-Head Attention with Ternary Weights
+layer MultiHeadAttention {
+    params {
+        embed_dim: int
+        num_heads: int
+        dropout: float
+        quantization: str = "ternary"
+    }
+    
+    head_dim: int = embed_dim / num_heads
+    scale: float = head_dim ** -0.5
+    
+    // Query, Key, Value projections
+    layer qkv: TernaryLinear {
+        in_features: embed_dim
+        out_features: embed_dim * 3
+        quantization: quantization
+    }
+    
+    layer attn_dropout: Dropout { p: dropout }
+    
+    // Output projection
+    layer proj: TernaryLinear {
+        in_features: embed_dim
+        out_features: embed_dim
+        quantization: quantization
+    }
+    
+    layer proj_dropout: Dropout { p: dropout }
+    
+    forward(x: Tensor) -> Tensor {
+        B, N, C = x.shape
+        
+        // Compute Q, K, V
+        qkv = qkv(x)  // [B, N, 3*C]
+        qkv = reshape(qkv, [B, N, 3, num_heads, head_dim])
+        qkv = permute(qkv, [2, 0, 3, 1, 4])  // [3, B, heads, N, head_dim]
+        q, k, v = qkv[0], qkv[1], qkv[2]
+        
+        // Scaled dot-product attention
+        attn = (q @ transpose(k, -2, -1)) * scale
+        attn = softmax(attn, dim: -1)
+        attn = attn_dropout(attn)
+        
+        // Apply attention to values
+        x = attn @ v
+        x = transpose(x, 1, 2)  // [B, N, heads, head_dim]
+        x = reshape(x, [B, N, C])
+        
+        // Output projection
+        x = proj(x)
+        x = proj_dropout(x)
+        
+        return x
+    }
+}
+
+// MLP Block with Ternary Weights
+layer MLP {
+    params {
+        in_features: int
+        hidden_features: int
+        out_features: int
+        dropout: float
+        quantization: str = "ternary"
+    }
+    
+    layer fc1: TernaryLinear {
+        in_features: in_features
+        out_features: hidden_features
+        quantization: quantization
+    }
+    
+    layer act: GELU {}
+    
+    layer fc2: TernaryLinear {
+        in_features: hidden_features
+        out_features: out_features
+        quantization: quantization
+    }
+    
+    layer dropout: Dropout { p: dropout }
+    
+    forward(x: Tensor) -> Tensor {
+        x = fc1(x)
+        x = act(x)
+        x = dropout(x)
+        x = fc2(x)
+        x = dropout(x)
+        return x
+    }
+}
+
+// Example usage:
+// triton compile vision_transformer.triton --output ternary_vit.py
+// python ternary_vit.py --train --dataset imagenet --epochs 300 --gpu
+// python ternary_vit.py --eval --checkpoint vit_best.pth --test-dataset imagenet-val

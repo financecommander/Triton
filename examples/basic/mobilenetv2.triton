@@ -1,0 +1,229 @@
+// Ternary MobileNetV2 for ImageNet Classification
+// Optimized for mobile deployment with ternary quantization
+
+model TernaryMobileNetV2 {
+    // Model configuration
+    num_classes: 1000    // ImageNet classes
+    width_multiplier: 1.0
+    
+    // Initial convolution (full precision for better accuracy)
+    layer conv1: Conv2d {
+        in_channels: 3
+        out_channels: 32
+        kernel_size: 3
+        stride: 2
+        padding: 1
+        bias: false
+    }
+    
+    layer bn1: BatchNorm2d {
+        num_features: 32
+    }
+    
+    layer relu6: ReLU6 {}
+    
+    // Inverted residual blocks
+    // Expansion, output, num_blocks, stride
+    layer blocks: InvertedResidual[] {
+        [1, 16, 1, 1],      // t, c, n, s
+        [6, 24, 2, 2],
+        [6, 32, 3, 2],
+        [6, 64, 4, 2],
+        [6, 96, 3, 1],
+        [6, 160, 3, 2],
+        [6, 320, 1, 1],
+    }
+    
+    // Final layers
+    layer conv2: TernaryConv2d {
+        in_channels: 320
+        out_channels: 1280
+        kernel_size: 1
+        stride: 1
+        quantization: "deterministic"
+        bias: false
+    }
+    
+    layer bn2: BatchNorm2d {
+        num_features: 1280
+    }
+    
+    layer avgpool: AdaptiveAvgPool2d {
+        output_size: (1, 1)
+    }
+    
+    layer dropout: Dropout {
+        p: 0.2
+    }
+    
+    layer classifier: TernaryLinear {
+        in_features: 1280
+        out_features: num_classes
+        quantization: "deterministic"
+    }
+    
+    // Forward pass
+    forward(x: Tensor[batch_size, 3, 224, 224]) -> Tensor[batch_size, num_classes] {
+        // Initial convolution
+        x = conv1(x)
+        x = bn1(x)
+        x = relu6(x)
+        
+        // Inverted residual blocks
+        x = blocks(x)
+        
+        // Final convolution
+        x = conv2(x)
+        x = bn2(x)
+        x = relu6(x)
+        
+        // Classification head
+        x = avgpool(x)
+        x = flatten(x, start_dim: 1)
+        x = dropout(x)
+        x = classifier(x)
+        
+        return x
+    }
+    
+    // Training configuration
+    training {
+        optimizer: "rmsprop"
+        learning_rate: 0.045
+        momentum: 0.9
+        weight_decay: 0.00004
+        batch_size: 96
+        epochs: 150
+        
+        // Learning rate schedule
+        lr_schedule: {
+            type: "exponential"
+            gamma: 0.98  // decay per epoch
+        }
+        
+        // Data augmentation for ImageNet
+        augmentation: {
+            random_resized_crop: [224, 224]
+            random_horizontal_flip: 0.5
+            color_jitter: {
+                brightness: 0.2
+                contrast: 0.2
+                saturation: 0.2
+            }
+            normalize: {
+                mean: [0.485, 0.456, 0.406]
+                std: [0.229, 0.224, 0.225]
+            }
+        }
+        
+        gradient_estimator: "STE"
+        loss: "cross_entropy"
+        label_smoothing: 0.1
+    }
+    
+    // Expected performance
+    performance {
+        expected_top1_accuracy: 0.58   // 58% Top-1 on ImageNet
+        expected_top5_accuracy: 0.81   // 81% Top-5
+        model_size_mb: 3.4             // vs 14MB float32 (4x compression)
+        inference_ms: 45               // Mobile CPU (single core)
+        inference_fps: 22              // Frames per second
+        mac_operations: 300M           // Multiply-accumulate ops
+        compression_ratio: 4           // vs float32 baseline
+    }
+    
+    // Mobile optimization hints
+    optimization {
+        fuse_bn: true                  // Fuse BatchNorm into conv
+        quantize_first_last: false     // Keep first/last layer full precision
+        use_packed_weights: true       // 2-bit packed storage
+        skip_zero_weights: true        // Skip zero-valued ternary weights
+    }
+}
+
+// Inverted Residual Block (MobileNetV2)
+block InvertedResidual {
+    params {
+        in_channels: int
+        out_channels: int
+        stride: int
+        expand_ratio: int
+    }
+    
+    hidden_dim: int = in_channels * expand_ratio
+    use_residual: bool = (stride == 1 and in_channels == out_channels)
+    
+    // Expansion phase (pointwise)
+    layer expand_conv: if (expand_ratio != 1) {
+        TernaryConv2d {
+            in_channels: in_channels
+            out_channels: hidden_dim
+            kernel_size: 1
+            quantization: "deterministic"
+            bias: false
+        }
+        BatchNorm2d { num_features: hidden_dim }
+        ReLU6 {}
+    }
+    
+    // Depthwise convolution
+    layer depthwise_conv: TernaryConv2d {
+        in_channels: hidden_dim
+        out_channels: hidden_dim
+        kernel_size: 3
+        stride: stride
+        padding: 1
+        groups: hidden_dim  // Depthwise
+        quantization: "deterministic"
+        bias: false
+    }
+    
+    layer dw_bn: BatchNorm2d {
+        num_features: hidden_dim
+    }
+    
+    // Projection phase (pointwise linear)
+    layer project_conv: TernaryConv2d {
+        in_channels: hidden_dim
+        out_channels: out_channels
+        kernel_size: 1
+        quantization: "deterministic"
+        bias: false
+    }
+    
+    layer project_bn: BatchNorm2d {
+        num_features: out_channels
+    }
+    
+    forward(x: Tensor) -> Tensor {
+        identity = x
+        
+        // Expansion
+        if expand_conv is not None {
+            out = expand_conv(x)
+        } else {
+            out = x
+        }
+        
+        // Depthwise
+        out = depthwise_conv(out)
+        out = dw_bn(out)
+        out = relu6(out)
+        
+        // Projection
+        out = project_conv(out)
+        out = project_bn(out)
+        
+        // Residual connection
+        if use_residual {
+            out += identity
+        }
+        
+        return out
+    }
+}
+
+// Example usage:
+// triton compile mobilenetv2.triton --output ternary_mobilenetv2.py
+// python ternary_mobilenetv2.py --train --dataset imagenet --epochs 150 --gpu
+// python ternary_mobilenetv2.py --export-onnx --optimize-mobile

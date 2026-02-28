@@ -1,0 +1,72 @@
+// Simple Multi-Layer Perceptron for MNIST Classification
+// Demonstrates basic Triton DSL syntax with ternary weights
+
+model SimpleMLP {
+    // Model configuration
+    input_size: 784    // 28x28 flattened MNIST images
+    hidden_size: 256
+    output_size: 10    // 10 digit classes
+    
+    // Ternary linear layer: input -> hidden
+    layer fc1: TernaryLinear {
+        in_features: input_size
+        out_features: hidden_size
+        quantization: "deterministic"  // {-1, 0, 1}
+        threshold: 0.5
+    }
+    
+    // Activation with ternary quantization
+    layer act1: TernaryActivation {
+        method: "sign"
+        clip_value: 1.0
+    }
+    
+    // Ternary linear layer: hidden -> output
+    layer fc2: TernaryLinear {
+        in_features: hidden_size
+        out_features: output_size
+        quantization: "deterministic"
+        threshold: 0.5
+    }
+    
+    // Forward pass definition
+    forward(x: TernaryTensor[batch_size, input_size]) -> Tensor[batch_size, output_size] {
+        // Flatten input if needed
+        x = flatten(x, start_dim: 1)
+        
+        // First layer with activation
+        x = fc1(x)
+        x = act1(x)
+        
+        // Output layer (no activation for logits)
+        x = fc2(x)
+        
+        return x
+    }
+    
+    // Training configuration
+    training {
+        optimizer: "adam"
+        learning_rate: 0.001
+        batch_size: 128
+        epochs: 10
+        
+        // Straight-Through Estimator for gradients
+        gradient_estimator: "STE"
+        
+        // Loss function
+        loss: "cross_entropy"
+    }
+    
+    // Expected performance metrics
+    performance {
+        expected_accuracy: 0.96  // 96% on MNIST test set
+        model_size_kb: 53        // ~16x smaller than float32
+        inference_ms: 0.7        // CPU inference time
+        compression_ratio: 16    // vs float32 baseline
+    }
+}
+
+// Example usage:
+// triton compile simple_mlp.triton --output simple_mlp.py
+// python simple_mlp.py --train --dataset mnist --epochs 10
