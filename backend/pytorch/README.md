@@ -147,7 +147,7 @@ Compared to FP32 storage:
 
 ## Future Enhancements
 
-- [ ] CUDA kernel integration for GPU acceleration
+- [x] CUDA kernel integration for GPU acceleration
 - [ ] Sparse computation optimization (skip zeros)
 - [ ] Training support with ternary gradients
 - [ ] Quantization-aware training hooks

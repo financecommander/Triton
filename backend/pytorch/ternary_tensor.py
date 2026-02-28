@@ -4,6 +4,16 @@ import torch
 import torch.nn as nn
 from typing import Optional, Tuple
 
+# Import GPU optimization with graceful fallback
+try:
+    from backend.triton_gpu.gpu_optimizer import (
+        gpu_ternary_matmul,
+        ensure_contiguous_layout,
+    )
+    _GPU_OPT_AVAILABLE = True
+except ImportError:
+    _GPU_OPT_AVAILABLE = False
+
 
 class TernaryTensor:
     """
@@ -89,9 +99,11 @@ def ternary_matmul(a: torch.Tensor, b: torch.Tensor,
     else:
         b_ternary_tensor = b
     
-    # Basic implementation - in production, this would use optimized CUDA kernels
-    # For now, use standard matmul but with ternarized inputs
-    result = torch.matmul(a_ternary_tensor.float(), b_ternary_tensor.float())
+    # Basic implementation - use GPU-optimized kernels when available
+    if _GPU_OPT_AVAILABLE and a_ternary_tensor.is_cuda:
+        result = gpu_ternary_matmul(a_ternary_tensor, b_ternary_tensor)
+    else:
+        result = torch.matmul(a_ternary_tensor.float(), b_ternary_tensor.float())
     
     return result
 
@@ -112,6 +124,11 @@ class TernaryLinear(nn.Module):
         """Forward pass with ternary weights."""
         # Ternarize weights during forward pass
         ternary_weight = TernaryTensor.ternarize(self.weight)
+
+        # Ensure contiguous memory layout for GPU efficiency
+        if _GPU_OPT_AVAILABLE:
+            ternary_weight = ensure_contiguous_layout(ternary_weight)
+            x = ensure_contiguous_layout(x)
         
         # Use ternary matmul
         output = torch.matmul(x, ternary_weight.t())
@@ -144,6 +161,11 @@ class TernaryConv2d(nn.Module):
         """Forward pass with ternary weights."""
         # Ternarize weights
         ternary_weight = TernaryTensor.ternarize(self.weight)
+
+        # Ensure contiguous memory layout for GPU efficiency
+        if _GPU_OPT_AVAILABLE:
+            ternary_weight = ensure_contiguous_layout(ternary_weight)
+            x = ensure_contiguous_layout(x)
         
         # Use standard conv2d with ternarized weights
         output = torch.nn.functional.conv2d(
