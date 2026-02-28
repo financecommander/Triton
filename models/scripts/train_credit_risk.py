@@ -38,7 +38,6 @@ from pathlib import Path
 from torch.utils.data import Dataset, DataLoader
 
 # Add project root
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from models.credit_risk.ternary_credit_risk import (
     TernaryCreditRiskNet,

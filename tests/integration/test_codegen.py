@@ -10,7 +10,6 @@ import os
 from io import StringIO
 
 # Add project root to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../..'))
 
 from compiler.ast.nodes import LayerDef, Param
 from backend.pytorch.codegen import PyTorchCodeGenerator, generate_pytorch_code

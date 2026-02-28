@@ -18,7 +18,6 @@ import unittest
 from unittest.mock import Mock, patch, MagicMock
 
 # Add parent directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../'))
 
 # Mock torch before importing the training script
 sys.modules['torch'] = MagicMock()

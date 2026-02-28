@@ -23,7 +23,6 @@ from typing import Optional
 
 import sys
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from backend.pytorch.ternary_tensor import TernaryLinear
 

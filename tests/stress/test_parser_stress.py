@@ -11,7 +11,6 @@ import os
 from typing import List
 
 # Add project root to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../..'))
 
 from compiler.parser.triton_parser import parse
 
