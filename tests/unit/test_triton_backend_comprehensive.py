@@ -63,8 +63,17 @@ except (ImportError, Exception):
     CUDA_BASELINE_AVAILABLE = False
 
 # Check GPU availability
-HAS_CUDA = torch.cuda.is_available()
-GPU_COUNT = torch.cuda.device_count() if HAS_CUDA else 0
+try:
+    HAS_CUDA = torch.cuda.is_available()
+    GPU_COUNT = torch.cuda.device_count() if HAS_CUDA else 0
+    # Guard against torch being replaced by MagicMock in other test files
+    if not isinstance(GPU_COUNT, int):
+        GPU_COUNT = 0
+    if not isinstance(HAS_CUDA, bool):
+        HAS_CUDA = False
+except Exception:
+    HAS_CUDA = False
+    GPU_COUNT = 0
 
 
 # ============================================================================

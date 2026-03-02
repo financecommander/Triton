@@ -346,19 +346,19 @@ class TestPerformanceBenchmarking:
     @pytest.mark.skipif(not HAS_BENCHMARK, reason="pytest-benchmark not available")
     def test_medium_program_benchmark(self, benchmark):
         """Benchmark parsing of medium-sized programs."""
-        code = """
+        code = ""
         for i in range(100):
             code += f"fn func{i}() {{ return {i} }}\n"
-        
+
         benchmark(parse, code)
 
     @pytest.mark.skipif(not HAS_BENCHMARK, reason="pytest-benchmark not available")
     def test_large_program_benchmark(self, benchmark):
         """Benchmark parsing of large programs."""
-        code = """
+        code = ""
         for i in range(1000):
             code += f"let var{i}: int8 = {i % 3 - 1}\n"
-        
+
         benchmark(parse, code)
 
     @pytest.mark.skipif(not HAS_BENCHMARK, reason="pytest-benchmark not available")
